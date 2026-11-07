@@ -1,0 +1,56 @@
+package product
+
+import (
+	"context"
+
+	"github.com/igoroutine-courses/microservices.ecommerce.loms/internal/controller/converter"
+	"github.com/igoroutine-courses/microservices.ecommerce.loms/internal/entity"
+	productpb "github.com/igoroutine-courses/microservices.ecommerce.pkg/generated/loms/api/product/v1"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+)
+
+type (
+	productService interface {
+		CreateProduct(ctx context.Context, name string, price uint32) (entity.Product, error)
+		GetProduct(ctx context.Context, sku uint32) (entity.Product, error)
+	}
+)
+
+type ProductServer struct {
+	productService productService
+}
+
+func NewProductServer(productService productService) *ProductServer {
+	return &ProductServer{
+		productService: productService,
+	}
+}
+
+//type ProductServiceServer interface {
+//	CreateProduct(context.Context, *CreateProductRequest) (*CreateProductResponse, error)
+//	GetProduct(context.Context, *GetProductRequest) (*GetProductResponse, error)
+//}
+
+func (p *ProductServer) CreateProduct(ctx context.Context, req *productpb.CreateProductRequest) (*productpb.CreateProductResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+
+	product, err := p.productService.CreateProduct(ctx, req.Name, req.Price)
+	if err != nil {
+		return nil, converter.ToGRPCError(err)
+	}
+	return &productpb.CreateProductResponse{Sku: product.SKU}, nil
+}
+func (p *ProductServer) GetProduct(ctx context.Context, req *productpb.GetProductRequest) (*productpb.GetProductResponse, error) {
+	if err := req.Validate(); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+
+	product, err := p.productService.GetProduct(ctx, req.Sku)
+	if err != nil {
+		return nil, converter.ToGRPCError(err)
+	}
+	return &productpb.GetProductResponse{Price: product.Price, Name: product.Name}, nil
+}

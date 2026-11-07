@@ -1,0 +1,7 @@
+syntax = "proto3";
+
+package github.com.igoroutine_courses.microservices.ecommerce.notifications.v1;
+
+option go_package = "github.com/igoroutine-courses/microservices.ecommerce.pkg/generated/notifications/api/v1;notifications";
+
+// API Notifications будет определён при реализации третьей части задания.
