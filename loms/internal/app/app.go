@@ -6,45 +6,80 @@ import (
 	"net/http"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	adapternotifications "github.com/igoroutine-courses/microservices.ecommerce.loms/internal/adapter/notifications/grpc"
 	"github.com/igoroutine-courses/microservices.ecommerce.loms/internal/config"
 	"github.com/igoroutine-courses/microservices.ecommerce.loms/internal/controller"
+	"github.com/igoroutine-courses/microservices.ecommerce.loms/internal/repository/transactor"
+	lomsmigrations "github.com/igoroutine-courses/microservices.ecommerce.loms/migrations"
 	lompb "github.com/igoroutine-courses/microservices.ecommerce.pkg/generated/loms/api/loms/v1"
 	productpb "github.com/igoroutine-courses/microservices.ecommerce.pkg/generated/loms/api/product/v1"
 	stockspb "github.com/igoroutine-courses/microservices.ecommerce.pkg/generated/loms/api/stocks/v1"
+	notificaitonspb "github.com/igoroutine-courses/microservices.ecommerce.pkg/generated/notifications/api/notifications/v1"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
 	stockscontroller "github.com/igoroutine-courses/microservices.ecommerce.loms/internal/controller/stocks"
 	stocksrepo "github.com/igoroutine-courses/microservices.ecommerce.loms/internal/repository/stocks"
-	stocksusecase "github.com/igoroutine-courses/microservices.ecommerce.loms/internal/usercase/stocks"
+	stocksusecase "github.com/igoroutine-courses/microservices.ecommerce.loms/internal/usecase/stocks"
 
 	productcontroller "github.com/igoroutine-courses/microservices.ecommerce.loms/internal/controller/product"
 	productrepo "github.com/igoroutine-courses/microservices.ecommerce.loms/internal/repository/product"
-	productusecase "github.com/igoroutine-courses/microservices.ecommerce.loms/internal/usercase/product"
+	productusecase "github.com/igoroutine-courses/microservices.ecommerce.loms/internal/usecase/product"
 
 	lomscontroller "github.com/igoroutine-courses/microservices.ecommerce.loms/internal/controller/loms"
 	orderrepo "github.com/igoroutine-courses/microservices.ecommerce.loms/internal/repository/order"
-	lomsusecase "github.com/igoroutine-courses/microservices.ecommerce.loms/internal/usercase/loms"
+	lomsusecase "github.com/igoroutine-courses/microservices.ecommerce.loms/internal/usecase/loms"
 )
 
 func Run(logger *zap.Logger, cfg *config.Config) {
+	ctx := context.Background() //TODO FIXME сделать через errGroup как в cart
 
-	stocksRepo := stocksrepo.NewInMemoryRepository()
+	notificaitonConn, err := grpc.NewClient(
+		cfg.Clients.NotificationsGrpcAddr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+
+	if err != nil {
+		logger.Fatal("failed to connect to server", zap.Error(err))
+	}
+
+	defer func(conn *grpc.ClientConn) {
+		_ = conn.Close()
+	}(notificaitonConn)
+
+	notificationsClient := adapternotifications.NewNotificationsClient(
+		notificaitonspb.NewNotificationsClient(notificaitonConn),
+	)
+
+	pool, err := newPostgresPool(ctx, cfg.Postgres.DSN)
+	if err != nil {
+		logger.Error("failed to initialize PostgreSQL", zap.Error(err))
+		return
+	}
+	defer pool.Close()
+
+	if err := lomsmigrations.Run(pool); err != nil {
+		logger.Error("failed to run LOMS migrations", zap.Error(err))
+		return
+	}
+
+	lomsTransactor := transactor.NewTransactor(pool)
+
+	stocksRepo := stocksrepo.NewPostgresRepository(pool)
 	stocksService := stocksusecase.NewStocksService(stocksRepo)
 	stocksServer := stockscontroller.NewStocksServer(stocksService)
 
-	productRepo := productrepo.NewInMemoryRepository()
+	productRepo := productrepo.NewPostgresRepository(pool)
 	productService := productusecase.NewProductService(productRepo)
 	productServer := productcontroller.NewProductServer(productService)
 
-	lomsRepo := orderrepo.NewInMemoryRepository()
-	lomsService := lomsusecase.NewLomsService(lomsRepo, stocksRepo)
+	lomsRepo := orderrepo.NewPostgresRepository(pool)
+	lomsService := lomsusecase.NewLomsService(lomsRepo, stocksRepo, lomsTransactor, notificationsClient)
 	lomsServer := lomscontroller.NewLomsServer(lomsService)
 
 	api := controller.New(stocksServer, productServer, lomsServer)
 
-	ctx := context.Background()
 	go runGrpc(logger, cfg, api)
 	runRest(ctx, logger, cfg)
 }

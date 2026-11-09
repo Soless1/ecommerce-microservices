@@ -4,9 +4,9 @@ go 1.26.2
 
 require (
 	github.com/caarlos0/env/v10 v10.0.0
-	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
 	github.com/igoroutine-courses/microservices.ecommerce.pkg v0.0.0-00010101000000-000000000000
 	go.uber.org/zap v1.27.1
+	golang.org/x/sync v0.19.0
 	google.golang.org/grpc v1.79.2
 	google.golang.org/protobuf v1.36.11
 )
@@ -20,7 +20,6 @@ require (
 )
 
 require (
-	github.com/confluentinc/confluent-kafka-go/v2 v2.5.3
 	github.com/stretchr/testify v1.11.1 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/net v0.50.0 // indirect

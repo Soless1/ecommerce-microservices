@@ -2,7 +2,7 @@ package converter
 
 import (
 	"github.com/igoroutine-courses/microservices.ecommerce.loms/internal/entity"
-	"github.com/igoroutine-courses/microservices.ecommerce.loms/internal/usercase/loms"
+	"github.com/igoroutine-courses/microservices.ecommerce.loms/internal/usecase/loms"
 	lomspb "github.com/igoroutine-courses/microservices.ecommerce.pkg/generated/loms/api/loms/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

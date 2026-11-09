@@ -15,8 +15,10 @@ import (
 	"github.com/igoroutine-courses/microservices.ecommerce.cart/internal/controller"
 	cartcontroller "github.com/igoroutine-courses/microservices.ecommerce.cart/internal/controller/cart"
 	cartrepo "github.com/igoroutine-courses/microservices.ecommerce.cart/internal/repository/cart"
+	"github.com/igoroutine-courses/microservices.ecommerce.cart/internal/repository/transactor"
 	cartusecase "github.com/igoroutine-courses/microservices.ecommerce.cart/internal/usecase/cart"
 	itemusecase "github.com/igoroutine-courses/microservices.ecommerce.cart/internal/usecase/item"
+	cartmigrations "github.com/igoroutine-courses/microservices.ecommerce.cart/migrations"
 	cartpb "github.com/igoroutine-courses/microservices.ecommerce.pkg/generated/cart/api/cart/v1"
 	lomspb "github.com/igoroutine-courses/microservices.ecommerce.pkg/generated/loms/api/loms/v1"
 	productpb "github.com/igoroutine-courses/microservices.ecommerce.pkg/generated/loms/api/product/v1"
@@ -51,14 +53,28 @@ func Run(logger *zap.Logger, cfg *config.Config) {
 		stockspb.NewStocksClient(lomsConn),
 	)
 
-	cartRepo := cartrepo.NewInMemoryRepository()
-	cartService := cartusecase.NewCartService(cartRepo, productClient, lomsClient)
+	group, ctx := errgroup.WithContext(context.Background())
+
+	pool, err := newPostgresPool(ctx, cfg.Postgres.DSN)
+	if err != nil {
+		logger.Error("failed to initialize PostgreSQL", zap.Error(err))
+		return
+	}
+	defer pool.Close()
+
+	if err := cartmigrations.Run(pool); err != nil {
+		logger.Error("failed to run Cart migrations", zap.Error(err))
+		return
+	}
+	cartTransactor := transactor.NewTransactor(pool)
+
+	cartRepo := cartrepo.NewPostgresRepository(pool)
+	cartService := cartusecase.NewCartService(cartRepo, productClient, lomsClient, cartTransactor)
 	itemService := itemusecase.NewItemService(cartRepo, productClient, stocksClient)
 
 	cartServer := cartcontroller.NewCartServer(itemService, cartService)
 	api := controller.New(cartServer)
 
-	group, ctx := errgroup.WithContext(context.Background())
 	group.Go(func() error {
 		return runGrpc(ctx, logger, cfg, api)
 	})
@@ -70,7 +86,7 @@ func Run(logger *zap.Logger, cfg *config.Config) {
 	}
 }
 
-func runRest(ctx context.Context, logger *zap.Logger, cfg *config.Config) error {
+func runRest(ctx context.Context, Slogger *zap.Logger, cfg *config.Config) error {
 	mux := runtime.NewServeMux()
 
 	endpoint := cfg.GRPC.Endpoint

@@ -8,10 +8,6 @@ import (
 	"github.com/igoroutine-courses/microservices.ecommerce.loms/internal/entity"
 )
 
-var (
-	ErrInvalidStatus = entity.ErrInvalidStatus
-)
-
 // inMemoryRepository хранит заказы в памяти процесса.
 type inMemoryRepository struct {
 	mx     sync.RWMutex
@@ -64,6 +60,10 @@ func (r *inMemoryRepository) GetOrder(ctx context.Context, id int64) (entity.Ord
 	return cloneOrder(order), nil
 }
 
+func (r *inMemoryRepository) GetOrderForUpdate(ctx context.Context, id int64) (entity.Order, error) {
+	return r.GetOrder(ctx, id)
+}
+
 // SetOrderStatus меняет статус заказа и время последнего изменения.
 func (r *inMemoryRepository) SetOrderStatus(ctx context.Context, id int64, status entity.OrderStatus) error {
 	if err := ctx.Err(); err != nil {
@@ -79,33 +79,6 @@ func (r *inMemoryRepository) SetOrderStatus(ctx context.Context, id int64, statu
 	}
 
 	order.Status = status
-	order.UpdatedAt = time.Now()
-	r.orders[id] = order
-	return nil
-}
-
-func (r *inMemoryRepository) TransitionOrderStatus(
-	ctx context.Context,
-	id int64,
-	expected entity.OrderStatus,
-	next entity.OrderStatus,
-) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-
-	r.mx.Lock()
-	defer r.mx.Unlock()
-
-	order, ok := r.orders[id]
-	if !ok {
-		return entity.ErrOrderNotFound
-	}
-
-	if order.Status != expected {
-		return ErrInvalidStatus
-	}
-	order.Status = next
 	order.UpdatedAt = time.Now()
 	r.orders[id] = order
 	return nil

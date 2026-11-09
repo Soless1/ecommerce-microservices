@@ -12,7 +12,6 @@ type (
 	cartRepository interface {
 		AddItem(ctx context.Context, userId int64, item entity.CartItem) error
 		DeleteItem(ctx context.Context, userId int64, sku uint32) error
-		GetItemByUserID(ctx context.Context, userId int64, sku uint32) (entity.CartItem, error)
 	}
 
 	productClient interface {
@@ -50,7 +49,7 @@ func (s *itemService) AddItem(ctx context.Context, userId int64, Sku uint32, cou
 	if count == 0 {
 		return ErrZeroCount
 	}
-	product, err := s.productClient.GetProduct(ctx, Sku)
+	_, err := s.productClient.GetProduct(ctx, Sku)
 	if err != nil {
 		return err
 	}
@@ -62,7 +61,7 @@ func (s *itemService) AddItem(ctx context.Context, userId int64, Sku uint32, cou
 	if stock < uint64(count) {
 		return ErrInsufficientStock
 	}
-	return s.cartRepository.AddItem(ctx, userId, entity.CartItem{SKU: Sku, Count: count, Name: product.Name, Price: product.Price})
+	return s.cartRepository.AddItem(ctx, userId, entity.CartItem{SKU: Sku, Count: count})
 }
 
 func (s *itemService) DeleteItem(ctx context.Context, id int64, sku uint32) error {

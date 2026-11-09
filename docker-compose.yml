@@ -15,6 +15,7 @@ services:
       POSTGRES_DB: "ecommerce"
       POSTGRES_USER: "ecommerce_user"
       POSTGRES_PASSWORD: "12345"
+      POSTGRES_DSN: "postgres://ecommerce_user:12345@postgres:5432/ecommerce?sslmode=disable"
       LOMS_GRPC_ADDR: "loms:50052"
     depends_on:
       postgres:
@@ -41,6 +42,7 @@ services:
       POSTGRES_DB: "ecommerce"
       POSTGRES_USER: "ecommerce_user"
       POSTGRES_PASSWORD: "12345"
+      POSTGRES_DSN: "postgres://ecommerce_user:12345@postgres:5432/ecommerce?sslmode=disable"
       LOMS_GRPC_ADDR: "loms-2:50062"
     depends_on:
       postgres:
@@ -68,10 +70,12 @@ services:
       POSTGRES_DB: "ecommerce"
       POSTGRES_USER: "ecommerce_user"
       POSTGRES_PASSWORD: "12345"
+      POSTGRES_DSN: "postgres://ecommerce_user:12345@postgres:5432/ecommerce?sslmode=disable"
       OUTBOX_WORKERS: "1"
       OUTBOX_BATCH_SIZE: "10"
       OUTBOX_FETCH_PERIOD: "200ms"
       OUTBOX_IN_PROGRESS_TTL: "1s"
+      NOTIFICATIONS_GRPC_ADDR: "notifications:50053"
     depends_on:
       postgres:
         condition: service_healthy
@@ -94,6 +98,31 @@ services:
       POSTGRES_DB: "ecommerce"
       POSTGRES_USER: "ecommerce_user"
       POSTGRES_PASSWORD: "12345"
+      POSTGRES_DSN: "postgres://ecommerce_user:12345@postgres:5432/ecommerce?sslmode=disable"
+      OUTBOX_WORKERS: "1"
+      OUTBOX_BATCH_SIZE: "10"
+      OUTBOX_FETCH_PERIOD: "200ms"
+      OUTBOX_IN_PROGRESS_TTL: "1s"
+      NOTIFICATIONS_GRPC_ADDR: "notifications:50063"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      loms:
+        condition: service_started
+    ports:
+      - "50062:50062"
+      - "8091:8091"
+
+
+  notifications:
+    image: notifications
+    hostname: notifications-1
+    build:
+      context: .
+      dockerfile: ./notifications/Dockerfile
+    restart: unless-stopped
+    environment:
+      GRPC_PORT: "50053"
       OUTBOX_WORKERS: "1"
       OUTBOX_BATCH_SIZE: "10"
       OUTBOX_FETCH_PERIOD: "200ms"
@@ -104,8 +133,7 @@ services:
       loms:
         condition: service_started
     ports:
-      - "50062:50062"
-      - "8091:8091"
+      - "50053:50053"
 
   postgres:
     image: postgres:17

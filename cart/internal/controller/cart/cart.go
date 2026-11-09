@@ -3,7 +3,7 @@ package cart
 import (
 	"context"
 
-	"github.com/igoroutine-courses/microservices.ecommerce.cart/internal/entity"
+	"github.com/igoroutine-courses/microservices.ecommerce.cart/internal/port"
 )
 
 // TODO: mocks
@@ -15,7 +15,7 @@ type (
 	}
 
 	CartService interface {
-		ListCart(ctx context.Context, userId int64) ([]entity.CartItem, uint32, error)
+		ListCart(ctx context.Context, userId int64) ([]port.Item, uint32, error)
 		CheckoutCart(ctx context.Context, id int64) (int64, error)
 		ClearCart(ctx context.Context, id int64) error
 	}

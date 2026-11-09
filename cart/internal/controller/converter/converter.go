@@ -28,25 +28,10 @@ func ToGRPCError(err error) error {
 	}
 }
 
-func ToItem(item *cartpb.Item) entity.CartItem {
-	return entity.CartItem{SKU: item.GetSku(), Count: item.GetCount(), Name: item.GetName(), Price: item.GetPrice()}
-}
-func FromItem(item entity.CartItem) *cartpb.Item {
-	return &cartpb.Item{Sku: item.SKU, Count: item.Count, Name: item.Name, Price: item.Price}
-}
-
-func ToItems(items []*cartpb.Item) []entity.CartItem {
-	result := make([]entity.CartItem, len(items))
-	for i, item := range items {
-		result[i] = ToItem(item)
-	}
-	return result
-}
-
-func FromItems(items []entity.CartItem) []*cartpb.Item {
+func FromItems(items []port.Item) []*cartpb.Item {
 	result := make([]*cartpb.Item, len(items))
 	for i, item := range items {
-		result[i] = FromItem(item)
+		result[i] = &cartpb.Item{Sku: item.SKU, Count: item.Count, Name: item.Name, Price: item.Price}
 	}
 	return result
 }

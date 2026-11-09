@@ -1,0 +1,32 @@
+version: "2"
+
+sql:
+  - engine: "postgresql"
+    schema: "migrations"
+    queries: "internal/repository/order/queries.sql"
+    gen:
+      go:
+        package: "sqlc"
+        out: "internal/repository/order/sqlc"
+        sql_package: "pgx/v5"
+        emit_interface: true
+
+  - engine: "postgresql"
+    schema: "migrations"
+    queries: "internal/repository/stocks/queries.sql"
+    gen:
+      go:
+        package: "sqlc"
+        out: "internal/repository/stocks/sqlc"
+        sql_package: "pgx/v5"
+        emit_interface: true
+
+  - engine: "postgresql"
+    schema: "migrations"
+    queries: "internal/repository/product/queries.sql"
+    gen:
+      go:
+        package: "sqlc"
+        out: "internal/repository/product/sqlc"
+        sql_package: "pgx/v5"
+        emit_interface: true

@@ -14,6 +14,10 @@ type (
 
 			Endpoint string `env:"GRPC_ENDPOINT" envDefault:"localhost:50051"`
 		}
+
+		Postgres struct {
+			DSN string `env:"POSTGRES_DSN" envDefault:"postgres://ecommerce_user:12345@localhost:5432/ecommerce?sslmode=disable"`
+		}
 	}
 )
 

@@ -61,23 +61,6 @@ func (r *InMemoryRepository) DeleteItem(ctx context.Context, userId int64, sku u
 	return nil
 }
 
-func (r *InMemoryRepository) GetItemByUserID(ctx context.Context, userId int64, sku uint32) (entity.CartItem, error) {
-	if err := ctx.Err(); err != nil {
-		return entity.CartItem{}, err
-	}
-	r.mx.RLock()
-	defer r.mx.RUnlock()
-	userCart, ok := r.carts[userId]
-	if !ok {
-		return entity.CartItem{}, entity.ErrCartItemNotFound
-	}
-	item, ok := userCart[sku]
-	if !ok {
-		return entity.CartItem{}, entity.ErrCartItemNotFound
-	}
-	return item, nil
-}
-
 func (r *InMemoryRepository) GetItemsByUserID(ctx context.Context, userId int64) ([]entity.CartItem, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -93,20 +76,6 @@ func (r *InMemoryRepository) GetItemsByUserID(ctx context.Context, userId int64)
 		items = append(items, item)
 	}
 	return items, nil
-}
-
-func (r *InMemoryRepository) SetItemsByUserID(ctx context.Context, userId int64, items []entity.CartItem) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	r.mx.Lock()
-	defer r.mx.Unlock()
-	mp := make(map[uint32]entity.CartItem, len(items))
-	for _, item := range items {
-		mp[item.SKU] = item
-	}
-	r.carts[userId] = mp
-	return nil
 }
 
 func (r *InMemoryRepository) DeleteItemsByUserID(ctx context.Context, userId int64) error {

@@ -21,7 +21,7 @@ func TestAddItem(t *testing.T) {
 
 	products.EXPECT().GetProduct(ctx, uint32(123)).Return(port.ProductInfo{Name: "Shoes", Price: 500}, nil)
 	stocks.EXPECT().GetStock(ctx, uint32(123)).Return(uint64(4), nil)
-	repo.EXPECT().AddItem(ctx, int64(7), entity.CartItem{SKU: 123, Count: 2, Name: "Shoes", Price: 500}).Return(nil)
+	repo.EXPECT().AddItem(ctx, int64(7), entity.CartItem{SKU: 123, Count: 2}).Return(nil)
 
 	if err := service.AddItem(ctx, 7, 123, 2); err != nil {
 		t.Fatalf("AddItem() error = %v, want nil", err)
