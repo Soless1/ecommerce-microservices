@@ -17,12 +17,12 @@ func NewNotificationsServer(logger *zap.Logger) *NotificationsService {
 	return &NotificationsService{
 		logger: logger}
 }
-func (n *NotificationsService) SendOrderStatusChangedNotification(ctx context.Context, userID int64, orderID int64, status entity.OrderStatus) error {
-	time.Sleep(time.Millisecond * 400)
+func (n *NotificationsService) SendOrderStatusChangedNotification(ctx context.Context, body entity.OrderStatusChangedNotification) error {
+	time.Sleep(time.Second * 30)
 
 	n.logger.Info("Order status changed",
-		zap.String("user_id", strconv.FormatInt(userID, 10)),
-		zap.String("order_id", strconv.FormatInt(orderID, 10)),
-		zap.String("status", string(status)))
+		zap.String("user_id", strconv.FormatInt(body.UserID, 10)),
+		zap.String("order_id", strconv.FormatInt(body.OrderID, 10)),
+		zap.String("status", string(body.Status)))
 	return nil
 }

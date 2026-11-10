@@ -1,7 +1,7 @@
 services:
   cart:
     image: cart
-    hostname: cart
+    hostname: cart-1
     build:
       context: .
       dockerfile: ./cart/Dockerfile
@@ -57,7 +57,7 @@ services:
 
   loms:
     image: loms
-    hostname: loms
+    hostname: loms-1
     build:
       context: .
       dockerfile: ./loms/Dockerfile
@@ -74,7 +74,7 @@ services:
       OUTBOX_WORKERS: "1"
       OUTBOX_BATCH_SIZE: "10"
       OUTBOX_FETCH_PERIOD: "200ms"
-      OUTBOX_IN_PROGRESS_TTL: "1s"
+      OUTBOX_IN_PROGRESS_TTL: "60s"
       NOTIFICATIONS_GRPC_ADDR: "notifications:50053"
     depends_on:
       postgres:
@@ -102,8 +102,8 @@ services:
       OUTBOX_WORKERS: "1"
       OUTBOX_BATCH_SIZE: "10"
       OUTBOX_FETCH_PERIOD: "200ms"
-      OUTBOX_IN_PROGRESS_TTL: "1s"
-      NOTIFICATIONS_GRPC_ADDR: "notifications:50063"
+      OUTBOX_IN_PROGRESS_TTL: "60s"
+      NOTIFICATIONS_GRPC_ADDR: "notifications:50053"
     depends_on:
       postgres:
         condition: service_healthy
@@ -123,10 +123,6 @@ services:
     restart: unless-stopped
     environment:
       GRPC_PORT: "50053"
-      OUTBOX_WORKERS: "1"
-      OUTBOX_BATCH_SIZE: "10"
-      OUTBOX_FETCH_PERIOD: "200ms"
-      OUTBOX_IN_PROGRESS_TTL: "1s"
     depends_on:
       postgres:
         condition: service_healthy

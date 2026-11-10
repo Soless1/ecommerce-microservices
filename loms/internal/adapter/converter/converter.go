@@ -2,25 +2,22 @@ package converter
 
 import (
 	"github.com/igoroutine-courses/microservices.ecommerce.loms/internal/entity"
-	notificaitonspb "github.com/igoroutine-courses/microservices.ecommerce.pkg/generated/notifications/api/notifications/v1"
-	notificationspb "github.com/igoroutine-courses/microservices.ecommerce.pkg/generated/notifications/api/notifications/v1"
+	"github.com/igoroutine-courses/microservices.ecommerce.loms/internal/port"
 )
 
-func FromOrderStatus(orderStatus entity.OrderStatus) notificaitonspb.OrderStatus {
+func FromOrderStatus(orderStatus entity.OrderStatus) port.OrderStatus {
 	switch orderStatus {
-	case entity.OrderStatusUnspecified:
-		return notificationspb.OrderStatus_ORDER_STATUS_UNSPECIFIED
 	case entity.OrderStatusNew:
-		return notificationspb.OrderStatus_ORDER_STATUS_NEW
+		return port.OrderStatusNew
 	case entity.OrderStatusAwaitingPayment:
-		return notificationspb.OrderStatus_ORDER_STATUS_AWAITING_PAYMENT
+		return port.OrderStatusAwaitingPayment
 	case entity.OrderStatusFailed:
-		return notificationspb.OrderStatus_ORDER_STATUS_FAILED
+		return port.OrderStatusFailed
 	case entity.OrderStatusPaid:
-		return notificationspb.OrderStatus_ORDER_STATUS_PAID
+		return port.OrderStatusPaid
 	case entity.OrderStatusCancelled:
-		return notificationspb.OrderStatus_ORDER_STATUS_CANCELLED
+		return port.OrderStatusCancelled
 	default:
-		return notificationspb.OrderStatus_ORDER_STATUS_UNSPECIFIED
+		return port.OrderStatusUnspecified
 	}
 }

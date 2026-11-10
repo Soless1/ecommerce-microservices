@@ -3,8 +3,7 @@ package grpc
 import (
 	"context"
 
-	"github.com/igoroutine-courses/microservices.ecommerce.loms/internal/adapter/converter"
-	"github.com/igoroutine-courses/microservices.ecommerce.loms/internal/entity"
+	"github.com/igoroutine-courses/microservices.ecommerce.loms/internal/port"
 	notificationspb "github.com/igoroutine-courses/microservices.ecommerce.pkg/generated/notifications/api/notifications/v1"
 )
 
@@ -16,7 +15,7 @@ func NewNotificationsClient(notificationsClient notificationspb.NotificationsCli
 	return &NotificationsClient{notificationsClient}
 }
 
-func (c *NotificationsClient) SendOrderStatusChangedNotification(ctx context.Context, userId int64, orderId int64, status entity.OrderStatus) error {
-	_, err := c.notificationsClient.SendOrderStatusChangedNotification(ctx, &notificationspb.OrderStatusChangedNotificationRequest{UserId: userId, OrderId: orderId, Status: converter.FromOrderStatus(status)})
+func (c *NotificationsClient) SendOrderStatusChangedNotification(ctx context.Context, order port.OrderStatusChangedNotification) error {
+	_, err := c.notificationsClient.SendOrderStatusChangedNotification(ctx, &notificationspb.OrderStatusChangedNotificationRequest{UserId: order.UserID, OrderId: order.OrderID, Status: FromOrderStatus(order.Status)})
 	return err
 }

@@ -2,13 +2,16 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
-	adapternotifications "github.com/igoroutine-courses/microservices.ecommerce.loms/internal/adapter/notifications/grpc"
+	notificationsadapter "github.com/igoroutine-courses/microservices.ecommerce.loms/internal/adapter/notifications/grpc"
 	"github.com/igoroutine-courses/microservices.ecommerce.loms/internal/config"
 	"github.com/igoroutine-courses/microservices.ecommerce.loms/internal/controller"
+	"github.com/igoroutine-courses/microservices.ecommerce.loms/internal/outbox"
+	outboxrepo "github.com/igoroutine-courses/microservices.ecommerce.loms/internal/repository/outbox"
 	"github.com/igoroutine-courses/microservices.ecommerce.loms/internal/repository/transactor"
 	lomsmigrations "github.com/igoroutine-courses/microservices.ecommerce.loms/migrations"
 	lompb "github.com/igoroutine-courses/microservices.ecommerce.pkg/generated/loms/api/loms/v1"
@@ -33,7 +36,7 @@ import (
 )
 
 func Run(logger *zap.Logger, cfg *config.Config) {
-	ctx := context.Background() //TODO FIXME сделать через errGroup как в cart
+	ctx := context.Background() //TODO сделать через errGroup как в cart
 
 	notificaitonConn, err := grpc.NewClient(
 		cfg.Clients.NotificationsGrpcAddr,
@@ -48,7 +51,7 @@ func Run(logger *zap.Logger, cfg *config.Config) {
 		_ = conn.Close()
 	}(notificaitonConn)
 
-	notificationsClient := adapternotifications.NewNotificationsClient(
+	notificationsClient := notificationsadapter.NewNotificationsClient(
 		notificaitonspb.NewNotificationsClient(notificaitonConn),
 	)
 
@@ -66,6 +69,8 @@ func Run(logger *zap.Logger, cfg *config.Config) {
 
 	lomsTransactor := transactor.NewTransactor(pool)
 
+	outboxRepo := outboxrepo.NewOutboxRepository(pool)
+
 	stocksRepo := stocksrepo.NewPostgresRepository(pool)
 	stocksService := stocksusecase.NewStocksService(stocksRepo)
 	stocksServer := stockscontroller.NewStocksServer(stocksService)
@@ -75,10 +80,24 @@ func Run(logger *zap.Logger, cfg *config.Config) {
 	productServer := productcontroller.NewProductServer(productService)
 
 	lomsRepo := orderrepo.NewPostgresRepository(pool)
-	lomsService := lomsusecase.NewLomsService(lomsRepo, stocksRepo, lomsTransactor, notificationsClient)
+	lomsService := lomsusecase.NewLomsService(lomsRepo, stocksRepo, lomsTransactor, notificationsClient, outboxRepo)
 	lomsServer := lomscontroller.NewLomsServer(lomsService)
 
 	api := controller.New(stocksServer, productServer, lomsServer)
+
+	globalOutboxHandler := func(kind outboxrepo.Kind) (outbox.KindHandler, error) {
+		switch kind {
+		case outboxrepo.KindNotification:
+			return lomsService.OrderStatusChangedNotificationKindHandler, nil
+
+		default:
+			return nil, fmt.Errorf("unsupported outboxCore kind")
+		}
+	}
+
+	outbox := outbox.New(logger, outboxRepo, globalOutboxHandler, cfg, lomsTransactor)
+
+	outbox.Start(ctx, cfg.Outbox.Workers, cfg.Outbox.BatchSize, cfg.Outbox.FetchPeriod, cfg.Outbox.TTL)
 
 	go runGrpc(logger, cfg, api)
 	runRest(ctx, logger, cfg)

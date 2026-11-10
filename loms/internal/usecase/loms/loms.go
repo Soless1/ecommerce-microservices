@@ -2,9 +2,14 @@ package loms
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"strconv"
 
+	"github.com/igoroutine-courses/microservices.ecommerce.loms/internal/adapter/converter"
 	"github.com/igoroutine-courses/microservices.ecommerce.loms/internal/entity"
+	"github.com/igoroutine-courses/microservices.ecommerce.loms/internal/port"
+	outboxrepo "github.com/igoroutine-courses/microservices.ecommerce.loms/internal/repository/outbox"
 )
 
 var (
@@ -30,7 +35,15 @@ type (
 		WithTx(ctx context.Context, f func(context.Context) error) error
 	}
 	notificationsClient interface {
-		SendOrderStatusChangedNotification(ctx context.Context, userId int64, orderId int64, status entity.OrderStatus) error
+		SendOrderStatusChangedNotification(ctx context.Context, body port.OrderStatusChangedNotification) error
+	}
+	outboxRepository interface {
+		SendMessage(
+			ctx context.Context,
+			idempotencyKey string,
+			kind outboxrepo.Kind,
+			message []byte,
+		) error
 	}
 )
 
@@ -41,12 +54,14 @@ func NewLomsService(
 	stocksRepository stocksRepository,
 	transactor transactor,
 	notificationsClient notificationsClient,
+	outboxRepository outboxRepository,
 ) *lomsService {
 	return &lomsService{
 		orderRepository:     orderRepository,
 		stocksRepository:    stocksRepository,
 		transactor:          transactor,
 		notificationsClient: notificationsClient,
+		outboxRepository:    outboxRepository,
 	}
 }
 
@@ -55,6 +70,40 @@ type lomsService struct {
 	stocksRepository    stocksRepository
 	transactor          transactor
 	notificationsClient notificationsClient
+	outboxRepository    outboxRepository
+}
+
+func (s *lomsService) createIdempotencyKey(orderID int64, status entity.OrderStatus) string {
+	return strconv.FormatInt(orderID, 10) + "_" + string(status)
+}
+
+func (s *lomsService) createOutboxOrderStatusChangedNotification(ctx context.Context, order *entity.Order) error {
+	key := s.createIdempotencyKey(order.ID, order.Status)
+	body := port.OrderStatusChangedNotification{
+		UserID:  order.UserID,
+		OrderID: order.ID,
+		Status:  converter.FromOrderStatus(order.Status),
+	}
+
+	rawBody, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+
+	return s.outboxRepository.SendMessage(
+		ctx,
+		key,
+		outboxrepo.KindNotification,
+		rawBody,
+	)
+}
+
+func (s *lomsService) OrderStatusChangedNotificationKindHandler(ctx context.Context, data []byte) error {
+	var body port.OrderStatusChangedNotification
+	if err := json.Unmarshal(data, &body); err != nil {
+		return err
+	}
+	return s.notificationsClient.SendOrderStatusChangedNotification(ctx, body)
 }
 
 func (l *lomsService) CreateOrder(ctx context.Context, userID int64, items []entity.OrderItem) (int64, error) {
@@ -82,7 +131,7 @@ func (l *lomsService) CreateOrder(ctx context.Context, userID int64, items []ent
 	if err != nil {
 		return 0, err
 	}
-	err = l.notificationsClient.SendOrderStatusChangedNotification(ctx, userID, created.ID, created.Status)
+	err = l.createOutboxOrderStatusChangedNotification(ctx, &created)
 	if err != nil {
 		return 0, err
 	}
@@ -112,7 +161,9 @@ func (l *lomsService) PayOrder(ctx context.Context, id int64) error {
 		if err != nil {
 			return err
 		}
-		return l.notificationsClient.SendOrderStatusChangedNotification(ctx, order.UserID, order.ID, entity.OrderStatusPaid)
+		order.Status = entity.OrderStatusPaid
+
+		return l.createOutboxOrderStatusChangedNotification(ctx, &order)
 	})
 }
 func (l *lomsService) CancelOrder(ctx context.Context, id int64) error {
@@ -131,7 +182,8 @@ func (l *lomsService) CancelOrder(ctx context.Context, id int64) error {
 		if err != nil {
 			return err
 		}
-		return l.notificationsClient.SendOrderStatusChangedNotification(ctx, order.UserID, order.ID, entity.OrderStatusCancelled)
+		order.Status = entity.OrderStatusCancelled
 
+		return l.createOutboxOrderStatusChangedNotification(ctx, &order)
 	})
 }

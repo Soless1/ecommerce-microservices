@@ -10,3 +10,9 @@ const (
 	OrderStatusPaid            OrderStatus = "paid"
 	OrderStatusCancelled       OrderStatus = "cancelled"
 )
+
+type OrderStatusChangedNotification struct {
+	UserID  int64
+	OrderID int64
+	Status  OrderStatus
+}

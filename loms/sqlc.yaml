@@ -30,3 +30,14 @@ sql:
         out: "internal/repository/product/sqlc"
         sql_package: "pgx/v5"
         emit_interface: true
+
+
+  - engine: "postgresql"
+    schema: "migrations"
+    queries: "internal/repository/outbox/queries.sql"
+    gen:
+      go:
+        package: "sqlc"
+        out: "internal/repository/outbox/sqlc"
+        sql_package: "pgx/v5"
+        emit_interface: true

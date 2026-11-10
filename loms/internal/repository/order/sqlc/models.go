@@ -5,8 +5,99 @@
 package sqlc
 
 import (
+	"database/sql/driver"
+	"fmt"
+
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+type LomsOrderStatus string
+
+const (
+	LomsOrderStatusNew             LomsOrderStatus = "new"
+	LomsOrderStatusAwaitingpayment LomsOrderStatus = "awaiting payment"
+	LomsOrderStatusFailed          LomsOrderStatus = "failed"
+	LomsOrderStatusPaid            LomsOrderStatus = "paid"
+	LomsOrderStatusCancelled       LomsOrderStatus = "cancelled"
+)
+
+func (e *LomsOrderStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = LomsOrderStatus(s)
+	case string:
+		*e = LomsOrderStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for LomsOrderStatus: %T", src)
+	}
+	return nil
+}
+
+type NullLomsOrderStatus struct {
+	LomsOrderStatus LomsOrderStatus
+	Valid           bool // Valid is true if LomsOrderStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullLomsOrderStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.LomsOrderStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.LomsOrderStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullLomsOrderStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.LomsOrderStatus), nil
+}
+
+type LomsOutboxStatus string
+
+const (
+	LomsOutboxStatusCREATED    LomsOutboxStatus = "CREATED"
+	LomsOutboxStatusINPROGRESS LomsOutboxStatus = "IN_PROGRESS"
+	LomsOutboxStatusSUCCESS    LomsOutboxStatus = "SUCCESS"
+)
+
+func (e *LomsOutboxStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = LomsOutboxStatus(s)
+	case string:
+		*e = LomsOutboxStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for LomsOutboxStatus: %T", src)
+	}
+	return nil
+}
+
+type NullLomsOutboxStatus struct {
+	LomsOutboxStatus LomsOutboxStatus
+	Valid            bool // Valid is true if LomsOutboxStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullLomsOutboxStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.LomsOutboxStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.LomsOutboxStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullLomsOutboxStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.LomsOutboxStatus), nil
+}
 
 type LomsOrder struct {
 	OrderID   int64
@@ -16,20 +107,19 @@ type LomsOrder struct {
 	UpdatedAt pgtype.Timestamptz
 }
 
-type LomsOrderStatus string
-
-const (
-	LomsOrderStatusNew             LomsOrderStatus = "new"
-	LomsOrderStatusAwaitingPayment LomsOrderStatus = "awaiting payment"
-	LomsOrderStatusFailed          LomsOrderStatus = "failed"
-	LomsOrderStatusPaid            LomsOrderStatus = "paid"
-	LomsOrderStatusCancelled       LomsOrderStatus = "cancelled"
-)
-
 type LomsOrderItem struct {
 	OrderID int64
 	Sku     int64
 	Count   int64
+}
+
+type LomsOutbox struct {
+	IdempotencyKey string
+	Data           []byte
+	Status         LomsOutboxStatus
+	Kind           int32
+	CreatedAt      pgtype.Timestamp
+	UpdatedAt      pgtype.Timestamp
 }
 
 type LomsProduct struct {

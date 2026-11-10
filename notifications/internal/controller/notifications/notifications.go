@@ -13,7 +13,7 @@ import (
 )
 
 type NotificationService interface {
-	SendOrderStatusChangedNotification(ctx context.Context, userId int64, orderId int64, orderStatus entity.OrderStatus) error
+	SendOrderStatusChangedNotification(ctx context.Context, body entity.OrderStatusChangedNotification) error
 }
 type NotificationsServer struct {
 	notificationsService NotificationService
@@ -30,7 +30,7 @@ func (s *NotificationsServer) SendOrderStatusChangedNotification(ctx context.Con
 		return nil, status.Error(codes.InvalidArgument, "invalid request")
 	}
 
-	err := s.notificationsService.SendOrderStatusChangedNotification(ctx, req.UserId, req.OrderId, converter.ToOrderStatus(req.Status))
+	err := s.notificationsService.SendOrderStatusChangedNotification(ctx, entity.OrderStatusChangedNotification{UserID: req.GetUserId(), OrderID: req.GetUserId(), Status: converter.ToOrderStatus(req.GetStatus())})
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
