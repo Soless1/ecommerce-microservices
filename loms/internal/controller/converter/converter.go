@@ -73,6 +73,8 @@ func FromItems(items []entity.OrderItem) []*lomspb.Item {
 
 func ToGRPCError(err error) error {
 	switch {
+	case errors.Is(err, entity.ErrProductNotFound):
+		return status.Error(codes.NotFound, "product not found")
 	case errors.Is(err, entity.ErrOrderNotFound):
 		return status.Error(codes.NotFound, "order not found")
 	case errors.Is(err, entity.ErrStockNotFound):

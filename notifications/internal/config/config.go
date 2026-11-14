@@ -9,6 +9,8 @@ type Config struct {
 
 		Endpoint string `env:"GRPC_ENDPOINT" envDefault:"localhost:50051"`
 	}
+
+	CallbackAddr string `env:"CALLBACK_ADDR"`
 }
 
 func New() (*Config, error) {

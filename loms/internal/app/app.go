@@ -2,9 +2,11 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
+	"time"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	notificationsadapter "github.com/igoroutine-courses/microservices.ecommerce.loms/internal/adapter/notifications/grpc"
@@ -19,6 +21,7 @@ import (
 	stockspb "github.com/igoroutine-courses/microservices.ecommerce.pkg/generated/loms/api/stocks/v1"
 	notificaitonspb "github.com/igoroutine-courses/microservices.ecommerce.pkg/generated/notifications/api/notifications/v1"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -36,7 +39,7 @@ import (
 )
 
 func Run(logger *zap.Logger, cfg *config.Config) {
-	ctx := context.Background() //TODO сделать через errGroup как в cart
+	group, ctx := errgroup.WithContext(context.Background())
 
 	notificaitonConn, err := grpc.NewClient(
 		cfg.Clients.NotificationsGrpcAddr,
@@ -99,11 +102,18 @@ func Run(logger *zap.Logger, cfg *config.Config) {
 
 	outbox.Start(ctx, cfg.Outbox.Workers, cfg.Outbox.BatchSize, cfg.Outbox.FetchPeriod, cfg.Outbox.TTL)
 
-	go runGrpc(logger, cfg, api)
-	runRest(ctx, logger, cfg)
+	group.Go(func() error {
+		return runGrpc(ctx, logger, cfg, api)
+	})
+	group.Go(func() error {
+		return runRest(ctx, cfg)
+	})
+	if err := group.Wait(); err != nil {
+		logger.Error("LOMS server stopped with an error", zap.Error(err))
+	}
 }
 
-func runRest(ctx context.Context, logger *zap.Logger, cfg *config.Config) {
+func runRest(ctx context.Context, cfg *config.Config) error {
 	mux := runtime.NewServeMux()
 
 	endpoint := "localhost:" + cfg.GRPC.Port
@@ -112,31 +122,43 @@ func runRest(ctx context.Context, logger *zap.Logger, cfg *config.Config) {
 	}
 
 	if err := lompb.RegisterLomsHandlerFromEndpoint(ctx, mux, endpoint, options); err != nil {
-		logger.Error("failed to register LOMS gateway", zap.Error(err))
-		return
+		return fmt.Errorf("register LOMS gateway: %w", err)
 	}
 	if err := productpb.RegisterProductServiceHandlerFromEndpoint(ctx, mux, endpoint, options); err != nil {
-		logger.Error("failed to register Product gateway", zap.Error(err))
-		return
+		return fmt.Errorf("register Product gateway: %w", err)
 	}
 	if err := stockspb.RegisterStocksHandlerFromEndpoint(ctx, mux, endpoint, options); err != nil {
-		logger.Error("failed to register Stocks gateway", zap.Error(err))
-		return
+		return fmt.Errorf("register Stocks gateway: %w", err)
 	}
 
 	gatewayPort := ":" + cfg.GRPC.GatewayPort
-	handler := corsHandler(mux)
-
-	if err := http.ListenAndServe(gatewayPort, handler); err != nil {
-		logger.Error("gateway listen error", zap.Error(err))
+	server := &http.Server{
+		Addr:    gatewayPort,
+		Handler: corsHandler(mux),
 	}
+	shutdownErr := make(chan error, 1)
+	go func() {
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		shutdownErr <- server.Shutdown(shutdownCtx)
+	}()
+
+	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
+	if ctx.Err() != nil {
+		if err := <-shutdownErr; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-func runGrpc(logger *zap.Logger, cfg *config.Config, ctrl *controller.API) {
+func runGrpc(ctx context.Context, logger *zap.Logger, cfg *config.Config, ctrl *controller.API) error {
 	lis, err := net.Listen("tcp", ":"+cfg.GRPC.Port)
 	if err != nil {
-		logger.Error("failed to listen for gRPC", zap.Error(err))
-		return
+		return err
 	}
 
 	grpcServer := grpc.NewServer()
@@ -147,8 +169,24 @@ func runGrpc(logger *zap.Logger, cfg *config.Config, ctrl *controller.API) {
 
 	logger.Info("gRPC server is listening", zap.String("port", cfg.GRPC.Port))
 
-	if err := grpcServer.Serve(lis); err != nil {
-		logger.Error("gRPC server failed", zap.Error(err))
+	serveErr := make(chan error, 1)
+	go func() {
+		serveErr <- grpcServer.Serve(lis)
+	}()
+
+	select {
+	case <-ctx.Done():
+		grpcServer.GracefulStop()
+		err := <-serveErr
+		if err != nil && !errors.Is(err, grpc.ErrServerStopped) {
+			return err
+		}
+		return nil
+	case err := <-serveErr:
+		if errors.Is(err, grpc.ErrServerStopped) {
+			return nil
+		}
+		return err
 	}
 }
 

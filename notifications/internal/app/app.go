@@ -17,7 +17,7 @@ import (
 
 func Run(logger *zap.Logger, cfg *config.Config) {
 
-	notificationsService := notificationsusecase.NewNotificationsServer(logger)
+	notificationsService := notificationsusecase.NewNotificationsServer(logger, cfg.CallbackAddr)
 
 	notificationsServer := notifications.NewNotificationsServer(notificationsService)
 	api := controller.New(notificationsServer)

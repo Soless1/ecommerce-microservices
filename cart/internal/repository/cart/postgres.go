@@ -39,14 +39,8 @@ func (r *postgresRepository) AddItem(ctx context.Context, userId int64, newItem 
 
 func (r *postgresRepository) DeleteItem(ctx context.Context, userId int64, sku uint32) error {
 	queries := r.getQueries(ctx)
-	rows, err := queries.DeleteItem(ctx, sqlc.DeleteItemParams{UserID: userId, Sku: int64(sku)})
-	if err != nil {
-		return err
-	}
-	if rows == 0 {
-		return entity.ErrCartItemNotFound
-	}
-	return nil
+	_, err := queries.DeleteItem(ctx, sqlc.DeleteItemParams{UserID: userId, Sku: int64(sku)})
+	return err
 }
 
 func (r *postgresRepository) GetItemsByUserID(ctx context.Context, userId int64) ([]entity.CartItem, error) {

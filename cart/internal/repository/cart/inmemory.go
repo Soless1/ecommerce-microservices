@@ -53,9 +53,9 @@ func (r *InMemoryRepository) DeleteItem(ctx context.Context, userId int64, sku u
 	if !ok {
 		return entity.ErrCartItemNotFound
 	}
-	if _, ok := userCart[sku]; !ok {
-		return entity.ErrCartItemNotFound
-	}
+	//if _, ok := userCart[sku]; !ok {
+	//	return entity.ErrCartItemNotFound
+	//}
 
 	delete(userCart, sku)
 	return nil

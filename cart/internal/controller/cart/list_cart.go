@@ -13,6 +13,9 @@ func (c *cartServer) ListCart(req *cartpb.ListCartRequest, listCartServer cartpb
 	}
 	userId := req.GetUserId()
 	list, totalPrice, err := c.cartService.ListCart(listCartServer.Context(), userId)
+	if len(list) == 0 {
+		return nil
+	}
 	if err != nil {
 		return converter.ToGRPCError(err)
 	}
