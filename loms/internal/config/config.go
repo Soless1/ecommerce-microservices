@@ -1,7 +1,8 @@
 package config
 
 import (
-	"fmt"
+	"net"
+	"net/url"
 	"time"
 
 	"github.com/caarlos0/env/v10"
@@ -12,10 +13,6 @@ type (
 		GRPC struct {
 			Port        string `env:"GRPC_PORT" envDefault:"50052"`
 			GatewayPort string `env:"GRPC_GATEWAY_PORT" envDefault:"8081"`
-		}
-
-		Postgres struct {
-			DSN string `env:"POSTGRES_DSN" envDefault:"postgres://ecommerce_user:12345@localhost:5432/ecommerce?sslmode=disable"`
 		}
 
 		Clients struct {
@@ -40,13 +37,14 @@ type (
 )
 
 func (c *Config) ConstructPostgresURL() string {
-	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
-		c.PG.User,
-		c.PG.Password,
-		c.PG.Host,
-		c.PG.Port,
-		c.PG.DB,
-	)
+	u := url.URL{
+		Scheme:   "postgres",
+		User:     url.UserPassword(c.PG.User, c.PG.Password),
+		Host:     net.JoinHostPort(c.PG.Host, c.PG.Port),
+		Path:     "/" + c.PG.DB,
+		RawQuery: "sslmode=disable",
+	}
+	return u.String()
 }
 
 func New() (*Config, error) {

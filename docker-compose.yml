@@ -15,7 +15,6 @@ services:
       POSTGRES_DB: "ecommerce"
       POSTGRES_USER: "ecommerce_user"
       POSTGRES_PASSWORD: "12345"
-      POSTGRES_DSN: "postgres://ecommerce_user:12345@postgres:5432/ecommerce?sslmode=disable"
       LOMS_GRPC_ADDR: "loms:50052"
     depends_on:
       postgres:
@@ -42,7 +41,6 @@ services:
       POSTGRES_DB: "ecommerce"
       POSTGRES_USER: "ecommerce_user"
       POSTGRES_PASSWORD: "12345"
-      POSTGRES_DSN: "postgres://ecommerce_user:12345@postgres:5432/ecommerce?sslmode=disable"
       LOMS_GRPC_ADDR: "loms-2:50062"
     depends_on:
       postgres:
@@ -70,7 +68,6 @@ services:
       POSTGRES_DB: "ecommerce"
       POSTGRES_USER: "ecommerce_user"
       POSTGRES_PASSWORD: "12345"
-      POSTGRES_DSN: "postgres://ecommerce_user:12345@postgres:5432/ecommerce?sslmode=disable"
       OUTBOX_WORKERS: "1"
       OUTBOX_BATCH_SIZE: "10"
       OUTBOX_FETCH_PERIOD: "200ms"
@@ -102,7 +99,6 @@ services:
       POSTGRES_DB: "ecommerce"
       POSTGRES_USER: "ecommerce_user"
       POSTGRES_PASSWORD: "12345"
-      POSTGRES_DSN: "postgres://ecommerce_user:12345@postgres:5432/ecommerce?sslmode=disable"
       OUTBOX_WORKERS: "1"
       OUTBOX_BATCH_SIZE: "10"
       OUTBOX_FETCH_PERIOD: "200ms"

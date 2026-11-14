@@ -58,7 +58,7 @@ func Run(logger *zap.Logger, cfg *config.Config) {
 		notificaitonspb.NewNotificationsClient(notificaitonConn),
 	)
 
-	pool, err := newPostgresPool(ctx, cfg.Postgres.DSN)
+	pool, err := newPostgresPool(ctx, cfg.ConstructPostgresURL())
 	if err != nil {
 		logger.Error("failed to initialize PostgreSQL", zap.Error(err))
 		return
