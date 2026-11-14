@@ -17,9 +17,11 @@ pkg/generated
 *Dockerfile
 !Taskfile.yml
 !ci.yaml
+!/docker-compose.ci.yml
+!/docker-compose.test.yml
+!/cart/Dockerfile
+!/loms/Dockerfile
+!/notifications/Dockerfile
+!/integration-tests/Dockerfile
 mocks
-integration-tests
-!integration-tests/go.mod
-!integration-tests/go.sum
-!integration-tests/.gitignore
 !sqlc.yaml
