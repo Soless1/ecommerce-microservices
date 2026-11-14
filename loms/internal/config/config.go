@@ -3,6 +3,7 @@ package config
 import (
 	"net"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/caarlos0/env/v10"
@@ -13,10 +14,6 @@ type (
 		GRPC struct {
 			Port        string `env:"GRPC_PORT" envDefault:"50052"`
 			GatewayPort string `env:"GRPC_GATEWAY_PORT" envDefault:"8081"`
-		}
-
-		Clients struct {
-			NotificationsGrpcAddr string `env:"NOTIFICATIONS_GRPC_ADDR" envDefault:"localhost:50053"`
 		}
 
 		PG struct {
@@ -33,8 +30,27 @@ type (
 			FetchPeriod time.Duration `env:"OUTBOX_FETCH_PERIOD" envDefault:"5s"`
 			TTL         time.Duration `env:"OUTBOX_IN_PROGRESS_TTL" envDefault:"60s"`
 		}
+
+		Kafka struct {
+			Brokers string `env:"KAFKA_BROKERS" envDefault:"localhost:9092"`
+			Topic   string `env:"KAFKA_NOTIFICATIONS_TOPIC" envDefault:"order_status_notifications"`
+		}
 	}
 )
+
+func (c *Config) KafkaBrokerAddrs() []string {
+	parts := strings.Split(c.Kafka.Brokers, ",")
+	out := make([]string, 0, len(parts))
+
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+
+	return out
+}
 
 func (c *Config) ConstructPostgresURL() string {
 	u := url.URL{

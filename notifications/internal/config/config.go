@@ -1,16 +1,37 @@
 package config
 
-import "github.com/caarlos0/env/v10"
+import (
+	"strings"
+
+	"github.com/caarlos0/env/v10"
+)
 
 type Config struct {
-	GRPC struct {
-		Port        string `env:"GRPC_PORT" envDefault:"50051"`
-		GatewayPort string `env:"GRPC_GATEWAY_PORT" envDefault:"8080"`
-
-		Endpoint string `env:"GRPC_ENDPOINT" envDefault:"localhost:50051"`
+	Kafka struct {
+		Brokers       string `env:"KAFKA_BROKERS" envDefault:"localhost:9092"`
+		Topic         string `env:"KAFKA_NOTIFICATIONS_TOPIC" envDefault:"order_status_notifications"`
+		ConsumerGroup string `env:"KAFKA_CONSUMER_GROUP" envDefault:"notifications"`
 	}
 
-	CallbackAddr string `env:"CALLBACK_ADDR"`
+	TelegramNotifier struct {
+		Token    string `env:"TELEGRAM_TOKEN" envDefault:""`
+		ClientID int64  `env:"TELEGRAM_CHAT_ID" envDefault:""`
+	}
+	Clients struct {
+		CallbackAddr string `env:"CALLBACK_ADDR" envDefault:""`
+	}
+}
+
+func (c *Config) KafkaBrokerAddrs() []string {
+	parts := strings.Split(c.Kafka.Brokers, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 func New() (*Config, error) {

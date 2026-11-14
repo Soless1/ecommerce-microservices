@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
-	notificationsadapter "github.com/igoroutine-courses/microservices.ecommerce.loms/internal/adapter/notifications/grpc"
+	notificationskafka "github.com/igoroutine-courses/microservices.ecommerce.loms/internal/adapter/notifications/kafka"
 	"github.com/igoroutine-courses/microservices.ecommerce.loms/internal/config"
 	"github.com/igoroutine-courses/microservices.ecommerce.loms/internal/controller"
 	"github.com/igoroutine-courses/microservices.ecommerce.loms/internal/outbox"
@@ -19,7 +19,6 @@ import (
 	lompb "github.com/igoroutine-courses/microservices.ecommerce.pkg/generated/loms/api/loms/v1"
 	productpb "github.com/igoroutine-courses/microservices.ecommerce.pkg/generated/loms/api/product/v1"
 	stockspb "github.com/igoroutine-courses/microservices.ecommerce.pkg/generated/loms/api/stocks/v1"
-	notificaitonspb "github.com/igoroutine-courses/microservices.ecommerce.pkg/generated/notifications/api/notifications/v1"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
@@ -41,22 +40,19 @@ import (
 func Run(logger *zap.Logger, cfg *config.Config) {
 	group, ctx := errgroup.WithContext(context.Background())
 
-	notificaitonConn, err := grpc.NewClient(
-		cfg.Clients.NotificationsGrpcAddr,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
+	kafkaBrokers := cfg.KafkaBrokerAddrs()
 
-	if err != nil {
-		logger.Fatal("failed to connect to server", zap.Error(err))
+	if len(kafkaBrokers) == 0 {
+		logger.Fatal("no kafka brokers configured (KAFKA_BROKERS)")
 	}
 
-	defer func(conn *grpc.ClientConn) {
-		_ = conn.Close()
-	}(notificaitonConn)
+	notificationPublisher := notificationskafka.NewPublisher(kafkaBrokers, cfg.Kafka.Topic)
 
-	notificationsClient := notificationsadapter.NewNotificationsClient(
-		notificaitonspb.NewNotificationsClient(notificaitonConn),
-	)
+	defer func() {
+		if err := notificationPublisher.Close(); err != nil {
+			logger.Error("close kafka notifications publisher", zap.Error(err))
+		}
+	}()
 
 	pool, err := newPostgresPool(ctx, cfg.ConstructPostgresURL())
 	if err != nil {
@@ -83,7 +79,7 @@ func Run(logger *zap.Logger, cfg *config.Config) {
 	productServer := productcontroller.NewProductServer(productService)
 
 	lomsRepo := orderrepo.NewPostgresRepository(pool)
-	lomsService := lomsusecase.NewLomsService(lomsRepo, stocksRepo, lomsTransactor, notificationsClient, outboxRepo)
+	lomsService := lomsusecase.NewLomsService(lomsRepo, stocksRepo, lomsTransactor, notificationPublisher, outboxRepo)
 	lomsServer := lomscontroller.NewLomsServer(lomsService)
 
 	api := controller.New(stocksServer, productServer, lomsServer)

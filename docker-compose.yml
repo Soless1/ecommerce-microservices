@@ -22,8 +22,8 @@ services:
       loms:
         condition: service_started
     ports:
-      - "8080:8080"
-      - "50051:50051"
+      - "${CART_HTTP_HOST_PORT:-8080}:8080"
+      - "${CART_GRPC_HOST_PORT:-51051}:50051"
 
   cart-2:
     image: cart
@@ -72,7 +72,6 @@ services:
       OUTBOX_BATCH_SIZE: "10"
       OUTBOX_FETCH_PERIOD: "200ms"
       OUTBOX_IN_PROGRESS_TTL: "1s"
-      NOTIFICATIONS_GRPC_ADDR: "notifications:50053"
       KAFKA_BROKERS: "kafka-single:9092"
       KAFKA_NOTIFICATIONS_TOPIC: "order_status_notifications"
     depends_on:
@@ -81,8 +80,8 @@ services:
       kafka-single:
         condition: service_healthy
     ports:
-      - "50052:50052"
-      - "8081:8081"
+      - "${LOMS_GRPC_HOST_PORT:-51052}:50052"
+      - "${LOMS_HTTP_HOST_PORT:-8081}:8081"
 
   loms-2:
     image: loms
@@ -103,16 +102,15 @@ services:
       OUTBOX_BATCH_SIZE: "10"
       OUTBOX_FETCH_PERIOD: "200ms"
       OUTBOX_IN_PROGRESS_TTL: "1s"
-      NOTIFICATIONS_GRPC_ADDR: "notifications:50053"
       KAFKA_BROKERS: "kafka-single:9092"
       KAFKA_NOTIFICATIONS_TOPIC: "order_status_notifications"
     depends_on:
       postgres:
         condition: service_healthy
-      loms:
-        condition: service_started
       kafka-single:
         condition: service_healthy
+      loms:
+        condition: service_started
     ports:
       - "50062:50062"
       - "8091:8091"
@@ -126,20 +124,15 @@ services:
       dockerfile: ./notifications/Dockerfile
     restart: unless-stopped
     environment:
-      GRPC_PORT: "50053"
       CALLBACK_ADDR: "${CALLBACK_ADDR:-}"
+      TELEGRAM_TOKEN: "${TELEGRAM_TOKEN:-}"
+      TELEGRAM_CHAT_ID: "${TELEGRAM_CHAT_ID:-0}"
       KAFKA_BROKERS: "kafka-single:9092"
       KAFKA_NOTIFICATIONS_TOPIC: "order_status_notifications"
       KAFKA_CONSUMER_GROUP: "notifications"
     depends_on:
-      postgres:
-        condition: service_healthy
-      loms:
-        condition: service_started
       kafka-single:
         condition: service_healthy
-    ports:
-      - "50053:50053"
 
   postgres:
     image: postgres:17
@@ -167,9 +160,8 @@ services:
     image: confluentinc/cp-kafka:7.6.1
     hostname: kafka-single
     ports:
-      - "9092:9092"
-      - "9093:9094"
-      - "9101:9101"
+      - "${KAFKA_HOST_PORT:-9094}:9094"
+      - "${KAFKA_JMX_HOST_PORT:-9101}:9101"
     environment:
       CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
       KAFKA_PROCESS_ROLES: "broker,controller"
@@ -178,7 +170,7 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT"
       KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
       KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
-      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka-single:9092,PLAINTEXT_HOST://localhost:9093"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka-single:9092,PLAINTEXT_HOST://localhost:${KAFKA_HOST_PORT:-9094}"
       KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka-single:9093"
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
@@ -196,7 +188,7 @@ services:
   kafdrop:
     image: obsidiandynamics/kafdrop:4.0.1
     ports:
-      - "9000:9000"
+      - "${KAFDROP_HOST_PORT:-9000}:9000"
     environment:
       KAFKA_BROKERCONNECT: "kafka-single:9092"
       JVM_OPTS: "-Xms32M -Xmx64M"

@@ -126,17 +126,16 @@ func (l *lomsService) CreateOrder(ctx context.Context, userID int64, items []ent
 			Items:  items,
 			Status: entity.OrderStatusAwaitingPayment,
 		})
-		return err
+		if err != nil {
+			return err
+		}
+		return l.createOutboxOrderStatusChangedNotification(ctx, &created)
 	})
 	if err != nil {
 		return 0, err
 	}
-	err = l.createOutboxOrderStatusChangedNotification(ctx, &created)
-	if err != nil {
-		return 0, err
-	}
 
-	return created.ID, nil
+	return created.ID, err
 }
 
 func (l *lomsService) GetOrder(ctx context.Context, id int64) (entity.Order, error) {

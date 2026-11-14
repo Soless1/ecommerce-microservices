@@ -32,12 +32,12 @@ type config struct {
 	db *sql.DB
 
 	Clients struct {
-		Cart1GrpcAddr    string `env:"CART1_GRPC_ADDR" envDefault:"localhost:50051"`
+		Cart1GrpcAddr    string `env:"CART1_GRPC_ADDR" envDefault:"localhost:51051"`
 		Cart2GrpcAddr    string `env:"CART2_GRPC_ADDR" envDefault:"localhost:50061"`
 		Cart1GatewayAddr string `env:"CART1_GATEWAY_ADDR" envDefault:"localhost:8080"`
 		Cart2GatewayAddr string `env:"CART2_GATEWAY_ADDR" envDefault:"localhost:8090"`
 
-		Loms1GrpcAddr    string `env:"LOMS1_GRPC_ADDR" envDefault:"localhost:50052"`
+		Loms1GrpcAddr    string `env:"LOMS1_GRPC_ADDR" envDefault:"localhost:51052"`
 		Loms2GrpcAddr    string `env:"LOMS2_GRPC_ADDR" envDefault:"localhost:50062"`
 		Loms1GatewayAddr string `env:"LOMS1_GATEWAY_ADDR" envDefault:"localhost:8081"`
 		Loms2GatewayAddr string `env:"LOMS2_GATEWAY_ADDR" envDefault:"localhost:8091"`
@@ -52,7 +52,7 @@ type config struct {
 	}
 
 	Kafka struct {
-		Brokers string `env:"KAFKA_BROKERS" envDefault:"localhost:9093"`
+		Brokers string `env:"KAFKA_BROKERS" envDefault:"localhost:9094"`
 		Topic   string `env:"KAFKA_NOTIFICATIONS_TOPIC" envDefault:"order_status_notifications"`
 	}
 }

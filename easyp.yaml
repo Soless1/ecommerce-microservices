@@ -13,7 +13,6 @@ generate:
     inputs:
       - directory: "./cart/api"
       - directory: "./loms/api"
-      - directory: "./notifications/api"
     plugins:
         - name: go
           out: ./pkg/generated

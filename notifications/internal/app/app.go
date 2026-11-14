@@ -2,63 +2,32 @@ package app
 
 import (
 	"context"
-	"errors"
-	"net"
+	"os/signal"
+	"syscall"
 
 	"github.com/igoroutine-courses/microservices.ecommerce.notifications/internal/config"
-	"github.com/igoroutine-courses/microservices.ecommerce.notifications/internal/controller"
-	"github.com/igoroutine-courses/microservices.ecommerce.notifications/internal/controller/notifications"
-	notificationsusecase "github.com/igoroutine-courses/microservices.ecommerce.notifications/internal/usecase/notifications"
-	notificaitonspb "github.com/igoroutine-courses/microservices.ecommerce.pkg/generated/notifications/api/notifications/v1"
+	kafkaconsumer "github.com/igoroutine-courses/microservices.ecommerce.notifications/internal/consumer/kafka"
+	tgnotifier "github.com/igoroutine-courses/microservices.ecommerce.notifications/internal/usecase/notifier"
 	"go.uber.org/zap"
-	"golang.org/x/sync/errgroup"
-	"google.golang.org/grpc"
 )
 
 func Run(logger *zap.Logger, cfg *config.Config) {
 
-	notificationsService := notificationsusecase.NewNotificationsServer(logger, cfg.CallbackAddr)
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
 
-	notificationsServer := notifications.NewNotificationsServer(notificationsService)
-	api := controller.New(notificationsServer)
-
-	group, ctx := errgroup.WithContext(context.Background())
-	group.Go(func() error {
-		return runGrpc(ctx, logger, cfg, api)
-	})
-	if err := group.Wait(); err != nil {
-		logger.Error("Notifications server stopped with an error", zap.Error(err))
+	if len(cfg.KafkaBrokerAddrs()) == 0 {
+		logger.Fatal("no kafka brokers configured (KAFKA_BROKERS)")
 	}
-}
 
-func runGrpc(ctx context.Context, logger *zap.Logger, cfg *config.Config, ctrl *controller.API) error {
-	lis, err := net.Listen("tcp", ":"+cfg.GRPC.Port)
+	//notifier, err := tgnotifier.NewOrderStatusTelegramNotifier(logger, cfg)
+	notifier, err := tgnotifier.NewOrderStatusRestNotifier(logger, cfg)
+
 	if err != nil {
-		return err
+		logger.Fatal("tg notifier init error", zap.Error(err))
 	}
-	grpcServer := grpc.NewServer()
 
-	notificaitonspb.RegisterNotificationsServer(grpcServer, ctrl.Notifications)
-
-	logger.Info("gRPC server is listening", zap.String("port", cfg.GRPC.Port))
-
-	serveErr := make(chan error, 1)
-	go func() {
-		serveErr <- grpcServer.Serve(lis)
-	}()
-
-	select {
-	case <-ctx.Done():
-		grpcServer.GracefulStop()
-		err := <-serveErr
-		if err != nil && !errors.Is(err, grpc.ErrServerStopped) {
-			return err
-		}
-		return nil
-	case err := <-serveErr:
-		if errors.Is(err, grpc.ErrServerStopped) {
-			return nil
-		}
-		return err
+	if err := kafkaconsumer.RunConsumer(ctx, logger, cfg, notifier); err != nil {
+		logger.Fatal("kafka consumer stopped", zap.Error(err))
 	}
 }

@@ -12,7 +12,7 @@ const (
 )
 
 type OrderStatusChangedNotification struct {
-	UserID  int64
-	OrderID int64
-	Status  OrderStatus
+	UserID  int64       `json:"user_id"`
+	OrderID int64       `json:"order_id"`
+	Status  OrderStatus `json:"status"`
 }

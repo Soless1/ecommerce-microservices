@@ -2,10 +2,12 @@ package loms
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 
 	"github.com/igoroutine-courses/microservices.ecommerce.loms/internal/entity"
+	outboxrepo "github.com/igoroutine-courses/microservices.ecommerce.loms/internal/repository/outbox"
 	"github.com/igoroutine-courses/microservices.ecommerce.loms/internal/usecase/loms/mocks"
 	"go.uber.org/mock/gomock"
 )
@@ -21,11 +23,36 @@ func (t testTransactor) WithTx(ctx context.Context, f func(context.Context) erro
 	return t.commitErr
 }
 
+func expectOutboxNotification(t *testing.T, ctx context.Context, outbox *mocks.MockoutboxRepository, key, status string) *gomock.Call {
+	t.Helper()
+
+	type payload struct {
+		UserID  int64  `json:"user_id"`
+		OrderID int64  `json:"order_id"`
+		Status  string `json:"status"`
+	}
+	want := payload{UserID: 7, OrderID: 42, Status: status}
+	return outbox.EXPECT().
+		SendMessage(ctx, key, outboxrepo.KindNotification, gomock.Any()).
+		DoAndReturn(func(_ context.Context, _ string, _ outboxrepo.Kind, message []byte) error {
+			t.Helper()
+			var got payload
+			if err := json.Unmarshal(message, &got); err != nil {
+				t.Fatalf("decode outbox notification: %v", err)
+			}
+			if got != want {
+				t.Fatalf("outbox notification = %+v, want %+v", got, want)
+			}
+			return nil
+		})
+}
+
 func TestCreateOrder(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	orders := mocks.NewMockorderRepository(ctrl)
 	stocks := mocks.NewMockstocksRepository(ctrl)
-	service := NewLomsService(orders, stocks, testTransactor{})
+	outbox := mocks.NewMockoutboxRepository(ctrl)
+	service := NewLomsService(orders, stocks, testTransactor{}, mocks.NewMocknotificationsClient(ctrl), outbox)
 
 	ctx := context.Background()
 	items := []entity.OrderItem{{SKU: 123, Count: 2}}
@@ -43,7 +70,7 @@ func TestCreateOrder(t *testing.T) {
 		Items:  items,
 		Status: entity.OrderStatusAwaitingPayment,
 	}).Return(wantOrder, nil)
-	gomock.InOrder(reserveCall, createOrderCall)
+	gomock.InOrder(reserveCall, createOrderCall, expectOutboxNotification(t, ctx, outbox, "42_awaiting_payment", "awaiting_payment"))
 
 	gotOrderID, err := service.CreateOrder(ctx, 7, items)
 	if err != nil {
@@ -67,7 +94,7 @@ func TestCreateOrder_RejectsInvalidItems(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			orders := mocks.NewMockorderRepository(ctrl)
 			stocks := mocks.NewMockstocksRepository(ctrl)
-			service := NewLomsService(orders, stocks, testTransactor{})
+			service := NewLomsService(orders, stocks, testTransactor{}, mocks.NewMocknotificationsClient(ctrl), mocks.NewMockoutboxRepository(ctrl))
 
 			_, err := service.CreateOrder(context.Background(), 7, tt.items)
 			if !errors.Is(err, ErrWrongOrder) {
@@ -81,7 +108,7 @@ func TestCreateOrder_ReserveFailure(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	orders := mocks.NewMockorderRepository(ctrl)
 	stocks := mocks.NewMockstocksRepository(ctrl)
-	service := NewLomsService(orders, stocks, testTransactor{})
+	service := NewLomsService(orders, stocks, testTransactor{}, mocks.NewMocknotificationsClient(ctrl), mocks.NewMockoutboxRepository(ctrl))
 
 	wantErr := errors.New("not enough stock")
 	items := []entity.OrderItem{{SKU: 123, Count: 2}}
@@ -97,7 +124,7 @@ func TestCreateOrder_OrderFailure(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	orders := mocks.NewMockorderRepository(ctrl)
 	stocks := mocks.NewMockstocksRepository(ctrl)
-	service := NewLomsService(orders, stocks, testTransactor{})
+	service := NewLomsService(orders, stocks, testTransactor{}, mocks.NewMocknotificationsClient(ctrl), mocks.NewMockoutboxRepository(ctrl))
 
 	ctx := context.Background()
 	items := []entity.OrderItem{{SKU: 123, Count: 2}}
@@ -116,12 +143,14 @@ func TestCreateOrder_CommitFailure(t *testing.T) {
 	orders := mocks.NewMockorderRepository(ctrl)
 	stocks := mocks.NewMockstocksRepository(ctrl)
 	commitErr := errors.New("commit failure")
-	service := NewLomsService(orders, stocks, testTransactor{commitErr: commitErr})
+	outbox := mocks.NewMockoutboxRepository(ctrl)
+	service := NewLomsService(orders, stocks, testTransactor{commitErr: commitErr}, mocks.NewMocknotificationsClient(ctrl), outbox)
 
 	ctx := context.Background()
 	items := []entity.OrderItem{{SKU: 123, Count: 2}}
 	stocks.EXPECT().ReserveItems(ctx, items).Return(nil)
-	orders.EXPECT().CreateOrder(ctx, gomock.Any()).Return(entity.Order{ID: 42}, nil)
+	orders.EXPECT().CreateOrder(ctx, gomock.Any()).Return(entity.Order{ID: 42, UserID: 7, Status: entity.OrderStatusAwaitingPayment}, nil)
+	expectOutboxNotification(t, ctx, outbox, "42_awaiting_payment", "awaiting_payment")
 
 	id, err := service.CreateOrder(ctx, 7, items)
 	if id != 0 || !errors.Is(err, commitErr) {
@@ -132,7 +161,7 @@ func TestCreateOrder_CommitFailure(t *testing.T) {
 func TestGetOrder(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	orders := mocks.NewMockorderRepository(ctrl)
-	service := NewLomsService(orders, mocks.NewMockstocksRepository(ctrl), testTransactor{})
+	service := NewLomsService(orders, mocks.NewMockstocksRepository(ctrl), testTransactor{}, mocks.NewMocknotificationsClient(ctrl), mocks.NewMockoutboxRepository(ctrl))
 
 	ctx := context.Background()
 	want := entity.Order{ID: 42, UserID: 7, Status: entity.OrderStatusAwaitingPayment}
@@ -147,7 +176,7 @@ func TestGetOrder(t *testing.T) {
 func TestGetOrder_ReturnsRepositoryError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	orders := mocks.NewMockorderRepository(ctrl)
-	service := NewLomsService(orders, mocks.NewMockstocksRepository(ctrl), testTransactor{})
+	service := NewLomsService(orders, mocks.NewMockstocksRepository(ctrl), testTransactor{}, mocks.NewMocknotificationsClient(ctrl), mocks.NewMockoutboxRepository(ctrl))
 	wantErr := entity.ErrOrderNotFound
 	orders.EXPECT().GetOrder(gomock.Any(), int64(404)).Return(entity.Order{}, wantErr)
 
@@ -160,10 +189,14 @@ func TestGetOrder_ReturnsRepositoryError(t *testing.T) {
 func TestPayOrder(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	orders := mocks.NewMockorderRepository(ctrl)
-	service := NewLomsService(orders, mocks.NewMockstocksRepository(ctrl), testTransactor{})
+	outbox := mocks.NewMockoutboxRepository(ctrl)
+	service := NewLomsService(orders, mocks.NewMockstocksRepository(ctrl), testTransactor{}, mocks.NewMocknotificationsClient(ctrl), outbox)
 	ctx := context.Background()
-	orders.EXPECT().GetOrderForUpdate(ctx, int64(42)).Return(entity.Order{Status: entity.OrderStatusAwaitingPayment}, nil)
-	orders.EXPECT().SetOrderStatus(ctx, int64(42), entity.OrderStatusPaid).Return(nil)
+	gomock.InOrder(
+		orders.EXPECT().GetOrderForUpdate(ctx, int64(42)).Return(entity.Order{ID: 42, UserID: 7, Status: entity.OrderStatusAwaitingPayment}, nil),
+		orders.EXPECT().SetOrderStatus(ctx, int64(42), entity.OrderStatusPaid).Return(nil),
+		expectOutboxNotification(t, ctx, outbox, "42_paid", "paid"),
+	)
 
 	if err := service.PayOrder(ctx, 42); err != nil {
 		t.Fatalf("PayOrder() error = %v, want nil", err)
@@ -173,7 +206,7 @@ func TestPayOrder(t *testing.T) {
 func TestPayOrder_ReturnsRepositoryError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	orders := mocks.NewMockorderRepository(ctrl)
-	service := NewLomsService(orders, mocks.NewMockstocksRepository(ctrl), testTransactor{})
+	service := NewLomsService(orders, mocks.NewMockstocksRepository(ctrl), testTransactor{}, mocks.NewMocknotificationsClient(ctrl), mocks.NewMockoutboxRepository(ctrl))
 	wantErr := entity.ErrInvalidStatus
 	orders.EXPECT().GetOrderForUpdate(gomock.Any(), int64(42)).Return(entity.Order{Status: entity.OrderStatusCancelled}, nil)
 
@@ -187,13 +220,17 @@ func TestCancelOrder(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	orders := mocks.NewMockorderRepository(ctrl)
 	stocks := mocks.NewMockstocksRepository(ctrl)
-	service := NewLomsService(orders, stocks, testTransactor{})
+	outbox := mocks.NewMockoutboxRepository(ctrl)
+	service := NewLomsService(orders, stocks, testTransactor{}, mocks.NewMocknotificationsClient(ctrl), outbox)
 	ctx := context.Background()
-	order := entity.Order{ID: 42, Status: entity.OrderStatusAwaitingPayment, Items: []entity.OrderItem{{SKU: 123, Count: 2}}}
+	order := entity.Order{ID: 42, UserID: 7, Status: entity.OrderStatusAwaitingPayment, Items: []entity.OrderItem{{SKU: 123, Count: 2}}}
 
-	orders.EXPECT().GetOrderForUpdate(ctx, int64(42)).Return(order, nil)
-	stocks.EXPECT().ReleaseItems(gomock.Any(), order.Items).Return(nil)
-	orders.EXPECT().SetOrderStatus(ctx, int64(42), entity.OrderStatusCancelled).Return(nil)
+	gomock.InOrder(
+		orders.EXPECT().GetOrderForUpdate(ctx, int64(42)).Return(order, nil),
+		stocks.EXPECT().ReleaseItems(ctx, order.Items).Return(nil),
+		orders.EXPECT().SetOrderStatus(ctx, int64(42), entity.OrderStatusCancelled).Return(nil),
+		expectOutboxNotification(t, ctx, outbox, "42_cancelled", "cancelled"),
+	)
 
 	if err := service.CancelOrder(ctx, 42); err != nil {
 		t.Fatalf("CancelOrder() error = %v, want nil", err)
@@ -203,7 +240,7 @@ func TestCancelOrder(t *testing.T) {
 func TestCancelOrder_GetOrderFailure(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	orders := mocks.NewMockorderRepository(ctrl)
-	service := NewLomsService(orders, mocks.NewMockstocksRepository(ctrl), testTransactor{})
+	service := NewLomsService(orders, mocks.NewMockstocksRepository(ctrl), testTransactor{}, mocks.NewMocknotificationsClient(ctrl), mocks.NewMockoutboxRepository(ctrl))
 	wantErr := entity.ErrOrderNotFound
 	orders.EXPECT().GetOrderForUpdate(gomock.Any(), int64(404)).Return(entity.Order{}, wantErr)
 
@@ -217,7 +254,7 @@ func TestCancelOrder_InvalidStatus(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	orders := mocks.NewMockorderRepository(ctrl)
 	stocks := mocks.NewMockstocksRepository(ctrl)
-	service := NewLomsService(orders, stocks, testTransactor{})
+	service := NewLomsService(orders, stocks, testTransactor{}, mocks.NewMocknotificationsClient(ctrl), mocks.NewMockoutboxRepository(ctrl))
 	ctx := context.Background()
 	order := entity.Order{ID: 42, Status: entity.OrderStatusPaid}
 	wantErr := entity.ErrInvalidStatus
@@ -233,7 +270,7 @@ func TestCancelOrder_ReleaseFailure(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	orders := mocks.NewMockorderRepository(ctrl)
 	stocks := mocks.NewMockstocksRepository(ctrl)
-	service := NewLomsService(orders, stocks, testTransactor{})
+	service := NewLomsService(orders, stocks, testTransactor{}, mocks.NewMocknotificationsClient(ctrl), mocks.NewMockoutboxRepository(ctrl))
 	ctx := context.Background()
 	order := entity.Order{ID: 42, Status: entity.OrderStatusAwaitingPayment, Items: []entity.OrderItem{{SKU: 123, Count: 2}}}
 	releaseErr := errors.New("release failure")
@@ -251,12 +288,14 @@ func TestCancelOrder_CommitFailure(t *testing.T) {
 	orders := mocks.NewMockorderRepository(ctrl)
 	stocks := mocks.NewMockstocksRepository(ctrl)
 	commitErr := errors.New("commit failure")
-	service := NewLomsService(orders, stocks, testTransactor{commitErr: commitErr})
+	outbox := mocks.NewMockoutboxRepository(ctrl)
+	service := NewLomsService(orders, stocks, testTransactor{commitErr: commitErr}, mocks.NewMocknotificationsClient(ctrl), outbox)
 	ctx := context.Background()
-	order := entity.Order{ID: 42, Status: entity.OrderStatusAwaitingPayment, Items: []entity.OrderItem{{SKU: 123, Count: 2}}}
+	order := entity.Order{ID: 42, UserID: 7, Status: entity.OrderStatusAwaitingPayment, Items: []entity.OrderItem{{SKU: 123, Count: 2}}}
 	orders.EXPECT().GetOrderForUpdate(ctx, int64(42)).Return(order, nil)
 	stocks.EXPECT().ReleaseItems(ctx, order.Items).Return(nil)
 	orders.EXPECT().SetOrderStatus(ctx, int64(42), entity.OrderStatusCancelled).Return(nil)
+	expectOutboxNotification(t, ctx, outbox, "42_cancelled", "cancelled")
 
 	err := service.CancelOrder(ctx, 42)
 	if !errors.Is(err, commitErr) {

@@ -25,7 +25,7 @@ async function jsonFetch<T>(base: string, path: string, body?: object): Promise<
   return JSON.parse(text) as T
 }
 
-// Cart (gateway 8080)
+// Cart API
 export const cartApi = {
   addItem(userId: number, sku: number, count: number) {
     return jsonFetch<void>(CART_BASE, '/v1/cart/item/add', { user_id: userId, sku, count })
