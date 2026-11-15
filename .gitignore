@@ -6,7 +6,6 @@
 /cover.out.tmp
 .env
 old_project
-README.md
 /docs/spec
 node_modules
 dist

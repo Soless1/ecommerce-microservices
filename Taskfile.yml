@@ -8,7 +8,9 @@ vars:
 
 tasks:
   up:
-    docker-compose -f docker-compose.yml up --build -d
+    desc: "Build and start the backend"
+    cmds:
+      - docker compose -f docker-compose.yml up --build -d {{.CLI_ARGS}}
 
   down:
     docker-compose -f docker-compose.yml down -v --remove-orphans || true
