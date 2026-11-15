@@ -62,17 +62,6 @@ task up
 
 Для запуска без Telegram используй `task up -- cart cart-2` вместо `task up`. Compose запустит обе реплики `loms`, PostgreSQL, Kafka и Redis как зависимости корзины.
 
-Миграции PostgreSQL применяются при старте сервисов. Состояние контейнеров можно посмотреть через `docker compose ps`.
-
-| Компонент | Адрес на хосте |
-| --- | --- |
-| REST API корзины | `http://localhost:8080` |
-| REST API товаров, остатков и заказов | `http://localhost:8081` |
-| PostgreSQL, база `ecommerce` | `localhost:5432` |
-| Kafka | `localhost:9094` |
-| Redis, база `0` | `localhost:6379` |
-| Kafdrop при полном запуске | `http://localhost:9000` |
-
 Если нужен веб-интерфейс, установи Node.js с npm и выполни `task frontend` из корня проекта в отдельном терминале. Интерфейс откроется по адресу [http://localhost:5173](http://localhost:5173).
 
 Чтобы остановить бэкенд, выполни `docker compose down`. Данные PostgreSQL сохранятся в томе `postgres-data`.
