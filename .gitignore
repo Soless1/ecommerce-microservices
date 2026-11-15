@@ -7,13 +7,13 @@
 .env
 old_project
 README.md
-.golangci.yaml
 /docs/spec
 node_modules
 dist
 pkg/generated
 *.yaml
 *.yml
+!/.golangci.yaml
 *Dockerfile
 !Taskfile.yml
 !ci.yaml

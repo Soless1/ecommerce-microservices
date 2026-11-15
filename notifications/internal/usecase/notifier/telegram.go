@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/igoroutine-courses/microservices.ecommerce.notifications/internal/config"
@@ -25,7 +24,7 @@ func NewOrderStatusTelegramNotifier(logger *zap.Logger, cfg *config.Config) (*or
 		return nil, errors.New("TELEGRAM_CHAT_ID must not be zero")
 	}
 
-	bot, err := tgbotapi.NewBotAPIWithClient(token, tgbotapi.APIEndpoint, &http.Client{Timeout: 5 * time.Second})
+	bot, err := tgbotapi.NewBotAPIWithClient(token, tgbotapi.APIEndpoint, &http.Client{Timeout: cfg.Clients.HTTPTimeout})
 
 	if err != nil {
 		return nil, fmt.Errorf("create telegram bot api: %w", err)
@@ -108,7 +107,7 @@ func (n *orderStatusTelegramNotifierImpl) sendMessage(ctx context.Context, text 
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("Telegram sendMessage: HTTP %d", resp.StatusCode)
+		return fmt.Errorf("send Telegram message: HTTP %d", resp.StatusCode)
 	}
 	var result struct {
 		OK bool `json:"ok"`
@@ -117,7 +116,7 @@ func (n *orderStatusTelegramNotifierImpl) sendMessage(ctx context.Context, text 
 		return fmt.Errorf("decode Telegram response: %w", err)
 	}
 	if !result.OK {
-		return errors.New("Telegram rejected sendMessage")
+		return errors.New("send Telegram message: request rejected")
 	}
 	return nil
 }

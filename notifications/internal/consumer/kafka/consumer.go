@@ -5,11 +5,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	ckafka "github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/igoroutine-courses/microservices.ecommerce.notifications/internal/config"
 	"go.uber.org/zap"
+)
+
+const (
+	retryInterval  = 500 * time.Millisecond
+	sessionTimeout = 10 * time.Second
+	pollTimeout    = time.Second
 )
 
 type (
@@ -35,14 +42,14 @@ func retry(ctx context.Context, action func() error) error {
 			return err
 		}
 
-		if err := action(); err == nil {
+		err := action()
+		if err == nil {
 			return nil
-		} else {
-			select {
-			case <-ctx.Done():
-				return fmt.Errorf("%w (last attempt: %v)", ctx.Err(), err)
-			case <-time.After(500 * time.Millisecond):
-			}
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("%w (last attempt: %v)", ctx.Err(), err)
+		case <-time.After(retryInterval):
 		}
 	}
 }
@@ -59,12 +66,12 @@ func RunConsumer(
 	}
 
 	consumer, err := ckafka.NewConsumer(&ckafka.ConfigMap{
-		"bootstrap.servers":        joinBrokers(brokers),
+		"bootstrap.servers":        strings.Join(brokers, ","),
 		"group.id":                 cfg.Kafka.ConsumerGroup,
 		"auto.offset.reset":        "earliest",
 		"enable.auto.commit":       false,
 		"enable.auto.offset.store": false,
-		"session.timeout.ms":       10000,
+		"session.timeout.ms":       int(sessionTimeout.Milliseconds()),
 	})
 
 	if err != nil {
@@ -96,7 +103,7 @@ func RunConsumer(
 		}
 
 		// TODO: inbox + batch
-		ev := consumer.Poll(1000)
+		ev := consumer.Poll(int(pollTimeout.Milliseconds()))
 		if ev == nil {
 			continue
 		}
@@ -131,7 +138,7 @@ func RunConsumer(
 				zap.String("status", payload.Status),
 			)
 
-			deliveryCtx, cancelDelivery := context.WithTimeout(ctx, 30*time.Second)
+			deliveryCtx, cancelDelivery := context.WithTimeout(ctx, cfg.Kafka.DeliveryTimeout)
 			err := retry(deliveryCtx, func() error {
 				err := notifier.NotifyOrderStatusChanged(
 					deliveryCtx, payload.UserID, payload.OrderID, payload.Status,
@@ -150,13 +157,13 @@ func RunConsumer(
 				return fmt.Errorf("deliver notification for order %d: %w", payload.OrderID, err)
 			}
 
-			commitCtx, cancelCommit := context.WithTimeout(ctx, 10*time.Second)
+			commitCtx, cancelCommit := context.WithTimeout(ctx, cfg.Kafka.CommitTimeout)
 			err = retry(commitCtx, func() error {
-				_, err := consumer.CommitMessage(e)
-				if err != nil && ctx.Err() == nil {
-					eventLogger.Warn("kafka offset commit failed", zap.Error(err))
+				_, commitErr := consumer.CommitMessage(e)
+				if commitErr != nil && ctx.Err() == nil {
+					eventLogger.Warn("kafka offset commit failed", zap.Error(commitErr))
 				}
-				return err
+				return commitErr
 			})
 			cancelCommit()
 
@@ -194,24 +201,6 @@ func RunConsumer(
 			if err := consumer.Unassign(); err != nil {
 				logger.Error("kafka unassign partitions", zap.Error(err))
 			}
-
-		default:
-
 		}
 	}
-}
-
-func joinBrokers(brokers []string) string {
-	switch len(brokers) {
-	case 0:
-		return ""
-	case 1:
-		return brokers[0]
-	}
-
-	out := brokers[0]
-	for i := 1; i < len(brokers); i++ {
-		out += "," + brokers[i]
-	}
-	return out
 }

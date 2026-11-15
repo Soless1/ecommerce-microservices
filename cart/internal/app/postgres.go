@@ -3,21 +3,21 @@ package app
 import (
 	"context"
 	"fmt"
-	"time"
 
+	"github.com/igoroutine-courses/microservices.ecommerce.cart/internal/config"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func newPostgresPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
-	poolConfig, err := pgxpool.ParseConfig(dsn)
+func newPostgresPool(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
+	poolConfig, err := pgxpool.ParseConfig(cfg.ConstructPostgresURL())
 	if err != nil {
 		return nil, fmt.Errorf("parse PostgreSQL pool configuration: %w", err)
 	}
-	poolConfig.MaxConns = 8
-	poolConfig.MinConns = 1
-	poolConfig.HealthCheckPeriod = 30 * time.Second
-	poolConfig.MaxConnLifetime = 0
-	poolConfig.MaxConnIdleTime = 5 * time.Minute
+	poolConfig.MaxConns = cfg.PG.MaxConns
+	poolConfig.MinConns = cfg.PG.MinConns
+	poolConfig.HealthCheckPeriod = cfg.PG.HealthCheckPeriod
+	poolConfig.MaxConnLifetime = cfg.PG.MaxConnLifetime
+	poolConfig.MaxConnIdleTime = cfg.PG.MaxConnIdleTime
 
 	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {

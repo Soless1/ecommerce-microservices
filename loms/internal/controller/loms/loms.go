@@ -21,42 +21,42 @@ type (
 	}
 )
 
-type LomsServer struct {
+type Server struct {
 	lomsService lomsService
 }
 
-func NewLomsServer(lomsService lomsService) *LomsServer {
-	return &LomsServer{
+func NewLomsServer(lomsService lomsService) *Server {
+	return &Server{
 		lomsService: lomsService,
 	}
 }
 
-//type LomsServer interface {
+// type LomsServer interface {
 //	CreateOrder(context.Context, *CreateOrderRequest) (*CreateOrderResponse, error)
 //	GetOrder(context.Context, *GetOrderRequest) (*GetOrderResponse, error)
 //	PayOrder(context.Context, *PayOrderRequest) (*emptypb.Empty, error)
 //	CancelOrder(context.Context, *CancelOrderRequest) (*emptypb.Empty, error)
-//}
+// }
 
-func (l *LomsServer) CreateOrder(ctx context.Context, req *lomspb.CreateOrderRequest) (*lomspb.CreateOrderResponse, error) {
+func (l *Server) CreateOrder(ctx context.Context, req *lomspb.CreateOrderRequest) (*lomspb.CreateOrderResponse, error) {
 	if err := req.Validate(); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 
-	items := converter.ToItems(req.Items)
-	orderID, err := l.lomsService.CreateOrder(ctx, req.UserId, items)
+	items := converter.ToItems(req.GetItems())
+	orderID, err := l.lomsService.CreateOrder(ctx, req.GetUserId(), items)
 	if err != nil {
 		return nil, converter.ToGRPCError(err)
 	}
 	return &lomspb.CreateOrderResponse{OrderId: orderID}, nil
 }
 
-func (l *LomsServer) GetOrder(ctx context.Context, req *lomspb.GetOrderRequest) (*lomspb.GetOrderResponse, error) {
+func (l *Server) GetOrder(ctx context.Context, req *lomspb.GetOrderRequest) (*lomspb.GetOrderResponse, error) {
 	if err := req.Validate(); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 
-	order, err := l.lomsService.GetOrder(ctx, req.OrderId)
+	order, err := l.lomsService.GetOrder(ctx, req.GetOrderId())
 	if err != nil {
 		return nil, converter.ToGRPCError(err)
 	}
@@ -69,23 +69,23 @@ func (l *LomsServer) GetOrder(ctx context.Context, req *lomspb.GetOrderRequest) 
 	}, nil
 }
 
-func (l *LomsServer) PayOrder(ctx context.Context, req *lomspb.PayOrderRequest) (*emptypb.Empty, error) {
+func (l *Server) PayOrder(ctx context.Context, req *lomspb.PayOrderRequest) (*emptypb.Empty, error) {
 	if err := req.Validate(); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 
-	err := l.lomsService.PayOrder(ctx, req.OrderId)
+	err := l.lomsService.PayOrder(ctx, req.GetOrderId())
 	if err != nil {
 		return nil, converter.ToGRPCError(err)
 	}
 	return &emptypb.Empty{}, nil
 }
-func (l *LomsServer) CancelOrder(ctx context.Context, req *lomspb.CancelOrderRequest) (*emptypb.Empty, error) {
+func (l *Server) CancelOrder(ctx context.Context, req *lomspb.CancelOrderRequest) (*emptypb.Empty, error) {
 	if err := req.Validate(); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 
-	err := l.lomsService.CancelOrder(ctx, req.OrderId)
+	err := l.lomsService.CancelOrder(ctx, req.GetOrderId())
 	if err != nil {
 		return nil, converter.ToGRPCError(err)
 	}

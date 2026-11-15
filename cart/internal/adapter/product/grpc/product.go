@@ -16,10 +16,10 @@ func NewProductClient(productClientPb productpb.ProductServiceClient) *productCl
 	return &productClient{productClientPb}
 }
 
-func (c *productClient) GetProduct(ctx context.Context, SKU uint32) (port.ProductInfo, error) {
-	response, err := c.client.GetProduct(ctx, &productpb.GetProductRequest{Sku: SKU})
+func (c *productClient) GetProduct(ctx context.Context, sku uint32) (port.ProductInfo, error) {
+	response, err := c.client.GetProduct(ctx, &productpb.GetProductRequest{Sku: sku})
 	if err != nil {
 		return port.ProductInfo{}, adapterconverter.FromProductServiceError(err)
 	}
-	return port.ProductInfo{Price: response.Price, Name: response.Name}, nil
+	return port.ProductInfo{Price: response.GetPrice(), Name: response.GetName()}, nil
 }

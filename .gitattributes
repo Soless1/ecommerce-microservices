@@ -1,3 +1,4 @@
+*.go text eol=lf
 **/*.pb.go -diff -text
 **/*.pb.*.go -diff -text
 **/*_mock_test.go -diff -text

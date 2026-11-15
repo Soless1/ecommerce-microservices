@@ -68,10 +68,13 @@ services:
       OUTBOX_IN_PROGRESS_TTL: "1s"
       KAFKA_BROKERS: "kafka-single:9092"
       KAFKA_NOTIFICATIONS_TOPIC: "order_status_notifications"
+      REDIS_HOST: "redis"
     depends_on:
       postgres:
         condition: service_healthy
       kafka-single:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   loms-2:
@@ -95,12 +98,15 @@ services:
       OUTBOX_IN_PROGRESS_TTL: "1s"
       KAFKA_BROKERS: "kafka-single:9092"
       KAFKA_NOTIFICATIONS_TOPIC: "order_status_notifications"
+      REDIS_HOST: "redis"
     depends_on:
       postgres:
         condition: service_healthy
       loms:
         condition: service_started
       kafka-single:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   notifications:
@@ -118,6 +124,14 @@ services:
     depends_on:
       kafka-single:
         condition: service_healthy
+
+  redis:
+    image: redis:8-alpine
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   postgres:
     image: postgres:17

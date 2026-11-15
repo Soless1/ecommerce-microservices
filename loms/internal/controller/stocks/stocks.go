@@ -15,31 +15,31 @@ type stocksService interface {
 	GetStock(ctx context.Context, sku uint32) (uint64, error)
 }
 
-type StocksServer struct {
+type Server struct {
 	stocksService stocksService
 }
 
-func NewStocksServer(stocksService stocksService) *StocksServer {
-	return &StocksServer{stocksService: stocksService}
+func NewStocksServer(stocksService stocksService) *Server {
+	return &Server{stocksService: stocksService}
 }
 
-func (s *StocksServer) SetStock(ctx context.Context, req *stockspb.SetStockRequest) (*emptypb.Empty, error) {
+func (s *Server) SetStock(ctx context.Context, req *stockspb.SetStockRequest) (*emptypb.Empty, error) {
 	if err := req.Validate(); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 
-	if err := s.stocksService.SetStock(ctx, req.Sku, req.Count); err != nil {
+	if err := s.stocksService.SetStock(ctx, req.GetSku(), req.GetCount()); err != nil {
 		return nil, converter.ToGRPCError(err)
 	}
 	return &emptypb.Empty{}, nil
 }
 
-func (s *StocksServer) GetStock(ctx context.Context, req *stockspb.GetStockRequest) (*stockspb.GetStockResponse, error) {
+func (s *Server) GetStock(ctx context.Context, req *stockspb.GetStockRequest) (*stockspb.GetStockResponse, error) {
 	if err := req.Validate(); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 
-	count, err := s.stocksService.GetStock(ctx, req.Sku)
+	count, err := s.stocksService.GetStock(ctx, req.GetSku())
 	if err != nil {
 		return nil, converter.ToGRPCError(err)
 	}

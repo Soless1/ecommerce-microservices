@@ -3,7 +3,6 @@ package stocks
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/igoroutine-courses/microservices.ecommerce.loms/internal/entity"
 	"github.com/igoroutine-courses/microservices.ecommerce.loms/internal/repository/stocks/sqlc"
@@ -87,7 +86,7 @@ func aggregateItems(items []entity.OrderItem) (map[uint32]int64, error) {
 	requested := make(map[uint32]uint64, len(items))
 	for _, item := range items {
 		if item.Count == 0 {
-			return nil, fmt.Errorf("stock count must be positive")
+			return nil, errors.New("stock count must be positive")
 		}
 		requested[item.SKU] += uint64(item.Count)
 	}

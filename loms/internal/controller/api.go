@@ -7,11 +7,11 @@ import (
 )
 
 type API struct {
-	StockServer   *stocks.StocksServer
-	ProductServer *product.ProductServer
-	LomsServer    *loms.LomsServer
+	StockServer   *stocks.Server
+	ProductServer *product.Server
+	LomsServer    *loms.Server
 }
 
-func New(stockServer *stocks.StocksServer, productServer *product.ProductServer, lomsServer *loms.LomsServer) *API {
+func New(stockServer *stocks.Server, productServer *product.Server, lomsServer *loms.Server) *API {
 	return &API{StockServer: stockServer, ProductServer: productServer, LomsServer: lomsServer}
 }

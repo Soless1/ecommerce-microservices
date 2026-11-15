@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/igoroutine-courses/microservices.ecommerce.notifications/internal/config"
 	"go.uber.org/zap"
@@ -76,7 +75,7 @@ func (n *orderStatusRestNotifierImpl) NotifyOrderStatusChanged(
 	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{
-		Timeout: 5 * time.Second,
+		Timeout: n.cfg.Clients.HTTPTimeout,
 	}
 
 	resp, err := client.Do(req)

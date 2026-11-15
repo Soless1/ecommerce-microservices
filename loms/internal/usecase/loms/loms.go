@@ -106,7 +106,7 @@ func (s *lomsService) OrderStatusChangedNotificationKindHandler(ctx context.Cont
 	return s.notificationsClient.SendOrderStatusChangedNotification(ctx, body)
 }
 
-func (l *lomsService) CreateOrder(ctx context.Context, userID int64, items []entity.OrderItem) (int64, error) {
+func (s *lomsService) CreateOrder(ctx context.Context, userID int64, items []entity.OrderItem) (int64, error) {
 	if len(items) == 0 {
 		return 0, ErrWrongOrder
 	}
@@ -116,12 +116,12 @@ func (l *lomsService) CreateOrder(ctx context.Context, userID int64, items []ent
 		}
 	}
 	var created entity.Order
-	err := l.transactor.WithTx(ctx, func(ctx context.Context) error {
-		if err := l.stocksRepository.ReserveItems(ctx, items); err != nil {
+	err := s.transactor.WithTx(ctx, func(ctx context.Context) error {
+		if err := s.stocksRepository.ReserveItems(ctx, items); err != nil {
 			return err
 		}
 		var err error
-		created, err = l.orderRepository.CreateOrder(ctx, entity.Order{
+		created, err = s.orderRepository.CreateOrder(ctx, entity.Order{
 			UserID: userID,
 			Items:  items,
 			Status: entity.OrderStatusAwaitingPayment,
@@ -129,7 +129,7 @@ func (l *lomsService) CreateOrder(ctx context.Context, userID int64, items []ent
 		if err != nil {
 			return err
 		}
-		return l.createOutboxOrderStatusChangedNotification(ctx, &created)
+		return s.createOutboxOrderStatusChangedNotification(ctx, &created)
 	})
 	if err != nil {
 		return 0, err
@@ -138,17 +138,17 @@ func (l *lomsService) CreateOrder(ctx context.Context, userID int64, items []ent
 	return created.ID, err
 }
 
-func (l *lomsService) GetOrder(ctx context.Context, id int64) (entity.Order, error) {
-	order, err := l.orderRepository.GetOrder(ctx, id)
+func (s *lomsService) GetOrder(ctx context.Context, id int64) (entity.Order, error) {
+	order, err := s.orderRepository.GetOrder(ctx, id)
 	if err != nil {
 		return entity.Order{}, err
 	}
 	return order, nil
 }
 
-func (l *lomsService) PayOrder(ctx context.Context, id int64) error {
-	return l.transactor.WithTx(ctx, func(ctx context.Context) error {
-		order, err := l.orderRepository.GetOrderForUpdate(ctx, id)
+func (s *lomsService) PayOrder(ctx context.Context, id int64) error {
+	return s.transactor.WithTx(ctx, func(ctx context.Context) error {
+		order, err := s.orderRepository.GetOrderForUpdate(ctx, id)
 		if err != nil {
 			return err
 		}
@@ -156,33 +156,33 @@ func (l *lomsService) PayOrder(ctx context.Context, id int64) error {
 			return ErrInvalidStatus
 		}
 
-		err = l.orderRepository.SetOrderStatus(ctx, id, entity.OrderStatusPaid)
+		err = s.orderRepository.SetOrderStatus(ctx, id, entity.OrderStatusPaid)
 		if err != nil {
 			return err
 		}
 		order.Status = entity.OrderStatusPaid
 
-		return l.createOutboxOrderStatusChangedNotification(ctx, &order)
+		return s.createOutboxOrderStatusChangedNotification(ctx, &order)
 	})
 }
-func (l *lomsService) CancelOrder(ctx context.Context, id int64) error {
-	return l.transactor.WithTx(ctx, func(ctx context.Context) error {
-		order, err := l.orderRepository.GetOrderForUpdate(ctx, id)
+func (s *lomsService) CancelOrder(ctx context.Context, id int64) error {
+	return s.transactor.WithTx(ctx, func(ctx context.Context) error {
+		order, err := s.orderRepository.GetOrderForUpdate(ctx, id)
 		if err != nil {
 			return err
 		}
 		if order.Status != entity.OrderStatusAwaitingPayment {
 			return ErrInvalidStatus
 		}
-		if err := l.stocksRepository.ReleaseItems(ctx, order.Items); err != nil {
-			return err
+		if releaseErr := s.stocksRepository.ReleaseItems(ctx, order.Items); releaseErr != nil {
+			return releaseErr
 		}
-		err = l.orderRepository.SetOrderStatus(ctx, id, entity.OrderStatusCancelled)
+		err = s.orderRepository.SetOrderStatus(ctx, id, entity.OrderStatusCancelled)
 		if err != nil {
 			return err
 		}
 		order.Status = entity.OrderStatusCancelled
 
-		return l.createOutboxOrderStatusChangedNotification(ctx, &order)
+		return s.createOutboxOrderStatusChangedNotification(ctx, &order)
 	})
 }

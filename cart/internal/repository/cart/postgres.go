@@ -26,10 +26,10 @@ func (r *postgresRepository) getQueries(ctx context.Context) *sqlc.Queries {
 	return r.queries
 }
 
-func (r *postgresRepository) AddItem(ctx context.Context, userId int64, newItem entity.CartItem) error {
+func (r *postgresRepository) AddItem(ctx context.Context, userID int64, newItem entity.CartItem) error {
 	queries := r.getQueries(ctx)
 	err := queries.AddItem(ctx, sqlc.AddItemParams{
-		UserID: userId,
+		UserID: userID,
 		Sku:    int64(newItem.SKU),
 		Count:  int64(newItem.Count),
 	})
@@ -37,15 +37,15 @@ func (r *postgresRepository) AddItem(ctx context.Context, userId int64, newItem 
 	return err
 }
 
-func (r *postgresRepository) DeleteItem(ctx context.Context, userId int64, sku uint32) error {
+func (r *postgresRepository) DeleteItem(ctx context.Context, userID int64, sku uint32) error {
 	queries := r.getQueries(ctx)
-	_, err := queries.DeleteItem(ctx, sqlc.DeleteItemParams{UserID: userId, Sku: int64(sku)})
+	_, err := queries.DeleteItem(ctx, sqlc.DeleteItemParams{UserID: userID, Sku: int64(sku)})
 	return err
 }
 
-func (r *postgresRepository) GetItemsByUserID(ctx context.Context, userId int64) ([]entity.CartItem, error) {
+func (r *postgresRepository) GetItemsByUserID(ctx context.Context, userID int64) ([]entity.CartItem, error) {
 	queries := r.getQueries(ctx)
-	rows, err := queries.GetItemsByUserID(ctx, userId)
+	rows, err := queries.GetItemsByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -56,9 +56,9 @@ func (r *postgresRepository) GetItemsByUserID(ctx context.Context, userId int64)
 	return items, nil
 }
 
-func (r *postgresRepository) DeleteItemsByUserID(ctx context.Context, userId int64) error {
+func (r *postgresRepository) DeleteItemsByUserID(ctx context.Context, userID int64) error {
 	queries := r.getQueries(ctx)
-	_, err := queries.DeleteItemsByUserID(ctx, userId)
+	_, err := queries.DeleteItemsByUserID(ctx, userID)
 	if err != nil {
 		return err
 	}

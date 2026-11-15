@@ -10,8 +10,8 @@ import (
 
 type (
 	cartRepository interface {
-		AddItem(ctx context.Context, userId int64, item entity.CartItem) error
-		DeleteItem(ctx context.Context, userId int64, sku uint32) error
+		AddItem(ctx context.Context, userID int64, item entity.CartItem) error
+		DeleteItem(ctx context.Context, userID int64, sku uint32) error
 	}
 
 	productClient interface {
@@ -45,27 +45,26 @@ func NewItemService(cartRepository cartRepository, productClient productClient, 
 	}
 }
 
-func (s *itemService) AddItem(ctx context.Context, userId int64, Sku uint32, count uint32) error {
+func (s *itemService) AddItem(ctx context.Context, userID int64, sku uint32, count uint32) error {
 	if count == 0 {
 		return ErrZeroCount
 	}
-	_, err := s.productClient.GetProduct(ctx, Sku)
+	_, err := s.productClient.GetProduct(ctx, sku)
 	if err != nil {
 		return err
 	}
 
-	stock, err := s.stocksClient.GetStock(ctx, Sku)
+	stock, err := s.stocksClient.GetStock(ctx, sku)
 	if err != nil {
 		return err
 	}
 	if stock < uint64(count) {
 		return ErrInsufficientStock
 	}
-	return s.cartRepository.AddItem(ctx, userId, entity.CartItem{SKU: Sku, Count: count})
+	return s.cartRepository.AddItem(ctx, userID, entity.CartItem{SKU: sku, Count: count})
 }
 
 func (s *itemService) DeleteItem(ctx context.Context, id int64, sku uint32) error {
-
 	err := s.cartRepository.DeleteItem(ctx, id, sku)
 	if err != nil {
 		return err

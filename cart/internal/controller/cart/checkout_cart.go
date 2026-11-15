@@ -13,11 +13,11 @@ func (c *cartServer) CheckoutCart(ctx context.Context, req *cartpb.CheckoutCartR
 	if err := req.Validate(); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	UserId := req.GetUserId()
+	userID := req.GetUserId()
 
-	orderId, err := c.cartService.CheckoutCart(ctx, UserId)
+	orderID, err := c.cartService.CheckoutCart(ctx, userID)
 	if err != nil {
 		return nil, converter.ToGRPCError(err)
 	}
-	return &cartpb.CheckoutCartResponse{OrderId: orderId}, nil
+	return &cartpb.CheckoutCartResponse{OrderId: orderID}, nil
 }

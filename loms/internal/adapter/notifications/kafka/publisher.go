@@ -32,7 +32,6 @@ func (p *Publisher) SendOrderStatusChangedNotification(
 	ctx context.Context,
 	body port.OrderStatusChangedNotification,
 ) error {
-
 	raw, err := json.Marshal(body)
 	if err != nil {
 		return err

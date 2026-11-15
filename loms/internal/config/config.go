@@ -12,8 +12,9 @@ import (
 type (
 	Config struct {
 		GRPC struct {
-			Port        string `env:"GRPC_PORT" envDefault:"50052"`
-			GatewayPort string `env:"GRPC_GATEWAY_PORT" envDefault:"8081"`
+			Port                   string        `env:"GRPC_PORT" envDefault:"50052"`
+			GatewayPort            string        `env:"GRPC_GATEWAY_PORT" envDefault:"8081"`
+			GatewayShutdownTimeout time.Duration `env:"GRPC_GATEWAY_SHUTDOWN_TIMEOUT" envDefault:"5s"`
 		}
 
 		PG struct {
@@ -22,6 +23,12 @@ type (
 			DB       string `env:"POSTGRES_DB" envDefault:"ecommerce"`
 			User     string `env:"POSTGRES_USER" envDefault:"ecommerce_user"`
 			Password string `env:"POSTGRES_PASSWORD" envDefault:"12345"`
+
+			HealthCheckPeriod time.Duration `env:"POSTGRES_HEALTH_CHECK_PERIOD" envDefault:"30s"`
+			MaxConnIdleTime   time.Duration `env:"POSTGRES_MAX_CONN_IDLE_TIME" envDefault:"5m"`
+			MaxConnLifetime   time.Duration `env:"POSTGRES_MAX_CONN_LIFETIME" envDefault:"0s"`
+			MaxConns          int32         `env:"POSTGRES_MAX_CONNS" envDefault:"8"`
+			MinConns          int32         `env:"POSTGRES_MIN_CONNS" envDefault:"1"`
 		}
 
 		Outbox struct {

@@ -30,25 +30,17 @@ tasks:
           --abort-on-container-exit \
           --exit-code-from integration-tests
 
-  update:
-    desc: "Update tests"
-    requires:
-      vars: [ hw ]
-    cmds:
-      - go run .github/update.go -hw {{.hw}}
-
-  force-update:
-    desc: "Force update tests"
-    aliases: [ "force_update", "fu" ]
-    requires:
-      vars: [ hw ]
-    cmds:
-      - go run .github/update.go -force -hw {{.hw}}
-
   lint:
     desc: "Run golangci-lint"
     cmds:
       - |
+        set -e
+
+        set --
+        if [ -n "${LINT_BASE_REV:-}" ]; then
+          set -- "--new-from-rev=$LINT_BASE_REV"
+        fi
+
         if [ "${OS:-}" = "Windows_NT" ]; then
           LINT="{{.LOCAL_BIN}}/golangci-lint.exe"
         
@@ -63,7 +55,7 @@ tasks:
             echo " -> $mod"
             (
               cd "$mod"
-              "$LINT" run --config=../.golangci.yaml
+              "$LINT" run --config=../.golangci.yaml "$@"
             )
           done
         else 
@@ -78,7 +70,7 @@ tasks:
             echo " -> $mod"
             (
               cd "$mod"
-              "{{.LOCAL_BIN}}/golangci-lint" run --config=../.golangci.yaml
+              "{{.LOCAL_BIN}}/golangci-lint" run --config=../.golangci.yaml "$@"
             )
           done
         fi

@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	adapterloms "github.com/igoroutine-courses/microservices.ecommerce.cart/internal/adapter/loms/grpc"
@@ -60,7 +59,7 @@ func Run(logger *zap.Logger, cfg *config.Config) {
 
 	group, ctx := errgroup.WithContext(signalCtx)
 
-	pool, err := newPostgresPool(ctx, cfg.ConstructPostgresURL())
+	pool, err := newPostgresPool(ctx, cfg)
 	if err != nil {
 		logger.Error("failed to initialize PostgreSQL", zap.Error(err))
 		return
@@ -110,7 +109,7 @@ func runRest(ctx context.Context, cfg *config.Config) error {
 	shutdownErr := make(chan error, 1)
 	go func() {
 		<-ctx.Done()
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.GRPC.GatewayShutdownTimeout)
 		defer cancel()
 		shutdownErr <- server.Shutdown(shutdownCtx)
 	}()

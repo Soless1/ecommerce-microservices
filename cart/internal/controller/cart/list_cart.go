@@ -11,8 +11,8 @@ func (c *cartServer) ListCart(req *cartpb.ListCartRequest, listCartServer cartpb
 	if err := req.Validate(); err != nil {
 		return status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	userId := req.GetUserId()
-	list, totalPrice, err := c.cartService.ListCart(listCartServer.Context(), userId)
+	userID := req.GetUserId()
+	list, totalPrice, err := c.cartService.ListCart(listCartServer.Context(), userID)
 	if len(list) == 0 {
 		return nil
 	}

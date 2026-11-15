@@ -107,18 +107,15 @@ func (o *outboxImpl) worker(
 					message := messages[i]
 					key := message.IdempotencyKey
 
-					kindHandler, err := o.globalHandler(message.Kind)
-
-					if err != nil {
-						o.logger.Error("unexpected kind", zap.Error(err))
+					kindHandler, handlerErr := o.globalHandler(message.Kind)
+					if handlerErr != nil {
+						o.logger.Error("unexpected kind", zap.Error(handlerErr))
 						continue
 					}
 
-					err = kindHandler(ctx, message.Data)
-
-					if err != nil {
+					if dispatchErr := kindHandler(ctx, message.Data); dispatchErr != nil {
 						failedKeys = append(failedKeys, key)
-						o.logger.Error("kind error", zap.Error(err))
+						o.logger.Error("kind error", zap.Error(dispatchErr))
 						continue
 					}
 

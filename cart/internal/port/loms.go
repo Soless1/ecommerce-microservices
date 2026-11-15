@@ -14,7 +14,7 @@ type OrderItem struct {
 }
 
 func ToOrderItem(item *lomspb.Item) OrderItem {
-	return OrderItem{SKU: item.Sku, Count: item.Count}
+	return OrderItem{SKU: item.GetSku(), Count: item.GetCount()}
 }
 func FromOrderItem(item OrderItem) *lomspb.Item {
 	return &lomspb.Item{Sku: item.SKU, Count: item.Count}

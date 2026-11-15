@@ -9,8 +9,8 @@ import (
 
 type (
 	cartRepository interface {
-		GetItemsByUserID(ctx context.Context, userId int64) ([]entity.CartItem, error)
-		DeleteItemsByUserID(ctx context.Context, userId int64) error
+		GetItemsByUserID(ctx context.Context, userID int64) ([]entity.CartItem, error)
+		DeleteItemsByUserID(ctx context.Context, userID int64) error
 	}
 
 	productClient interface {
@@ -18,7 +18,7 @@ type (
 	}
 
 	lomsClient interface {
-		CreateOrder(ctx context.Context, userId int64, items []port.OrderItem) (int64, error)
+		CreateOrder(ctx context.Context, userID int64, items []port.OrderItem) (int64, error)
 	}
 	transactor interface {
 		WithTx(ctx context.Context, f func(context.Context) error) error
@@ -43,8 +43,8 @@ func NewCartService(cartRepository cartRepository, productClient productClient, 
 	}
 }
 
-func (s *cartService) ListCart(ctx context.Context, userId int64) ([]port.Item, uint32, error) {
-	items, err := s.cartRepository.GetItemsByUserID(ctx, userId)
+func (s *cartService) ListCart(ctx context.Context, userID int64) ([]port.Item, uint32, error) {
+	items, err := s.cartRepository.GetItemsByUserID(ctx, userID)
 	if err != nil {
 		return nil, 0, err
 	}

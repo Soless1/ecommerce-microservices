@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	notificationskafka "github.com/igoroutine-courses/microservices.ecommerce.loms/internal/adapter/notifications/kafka"
@@ -61,15 +60,15 @@ func Run(logger *zap.Logger, cfg *config.Config) {
 		}
 	}()
 
-	pool, err := newPostgresPool(ctx, cfg.ConstructPostgresURL())
+	pool, err := newPostgresPool(ctx, cfg)
 	if err != nil {
 		logger.Error("failed to initialize PostgreSQL", zap.Error(err))
 		return
 	}
 	defer pool.Close()
 
-	if err := lomsmigrations.Run(pool); err != nil {
-		logger.Error("failed to run LOMS migrations", zap.Error(err))
+	if migrationErr := lomsmigrations.Run(pool); migrationErr != nil {
+		logger.Error("failed to run LOMS migrations", zap.Error(migrationErr))
 		return
 	}
 
@@ -112,7 +111,7 @@ func Run(logger *zap.Logger, cfg *config.Config) {
 			return lomsService.OrderStatusChangedNotificationKindHandler, nil
 
 		default:
-			return nil, fmt.Errorf("unsupported outboxCore kind")
+			return nil, errors.New("unsupported outboxCore kind")
 		}
 	}
 
@@ -160,7 +159,7 @@ func runRest(ctx context.Context, cfg *config.Config) error {
 	shutdownErr := make(chan error, 1)
 	go func() {
 		<-ctx.Done()
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.GRPC.GatewayShutdownTimeout)
 		defer cancel()
 		shutdownErr <- server.Shutdown(shutdownCtx)
 	}()

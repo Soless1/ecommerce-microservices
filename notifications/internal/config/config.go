@@ -2,15 +2,18 @@ package config
 
 import (
 	"strings"
+	"time"
 
 	"github.com/caarlos0/env/v10"
 )
 
 type Config struct {
 	Kafka struct {
-		Brokers       string `env:"KAFKA_BROKERS" envDefault:"localhost:9092"`
-		Topic         string `env:"KAFKA_NOTIFICATIONS_TOPIC" envDefault:"order_status_notifications"`
-		ConsumerGroup string `env:"KAFKA_CONSUMER_GROUP" envDefault:"notifications"`
+		Brokers         string        `env:"KAFKA_BROKERS" envDefault:"localhost:9092"`
+		Topic           string        `env:"KAFKA_NOTIFICATIONS_TOPIC" envDefault:"order_status_notifications"`
+		ConsumerGroup   string        `env:"KAFKA_CONSUMER_GROUP" envDefault:"notifications"`
+		DeliveryTimeout time.Duration `env:"KAFKA_DELIVERY_TIMEOUT" envDefault:"30s"`
+		CommitTimeout   time.Duration `env:"KAFKA_COMMIT_TIMEOUT" envDefault:"10s"`
 	}
 
 	TelegramNotifier struct {
@@ -18,7 +21,8 @@ type Config struct {
 		ClientID int64  `env:"TELEGRAM_CHAT_ID" envDefault:""`
 	}
 	Clients struct {
-		CallbackAddr string `env:"CALLBACK_ADDR" envDefault:""`
+		CallbackAddr string        `env:"CALLBACK_ADDR" envDefault:""`
+		HTTPTimeout  time.Duration `env:"NOTIFICATIONS_HTTP_TIMEOUT" envDefault:"5s"`
 	}
 }
 

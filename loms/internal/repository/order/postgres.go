@@ -3,7 +3,6 @@ package order
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/igoroutine-courses/microservices.ecommerce.loms/internal/entity"
@@ -43,7 +42,7 @@ func (r *postgresRepository) CreateOrder(ctx context.Context, newOrder entity.Or
 
 	for _, item := range newOrder.Items {
 		if item.Count == 0 {
-			return entity.Order{}, fmt.Errorf("order item count must be positive")
+			return entity.Order{}, errors.New("order item count must be positive")
 		}
 		if err := queries.CreateOrderItem(ctx, sqlc.CreateOrderItemParams{
 			OrderID: newOrder.ID,

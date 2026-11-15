@@ -15,16 +15,16 @@ func NewStocksClient(stocksClientPb stockspb.StocksClient) *stocksClient {
 	return &stocksClient{stocksClientPb}
 }
 
-func (c *stocksClient) GetStock(ctx context.Context, SKU uint32) (uint64, error) {
-	response, err := c.client.GetStock(ctx, &stockspb.GetStockRequest{Sku: SKU})
+func (c *stocksClient) GetStock(ctx context.Context, sku uint32) (uint64, error) {
+	response, err := c.client.GetStock(ctx, &stockspb.GetStockRequest{Sku: sku})
 	if err != nil {
 		return 0, adapterconverter.FromStocksError(err)
 	}
-	return response.Count, nil
+	return response.GetCount(), nil
 }
 
-func (c *stocksClient) SetStock(ctx context.Context, SKU uint32, count uint64) error {
-	_, err := c.client.SetStock(ctx, &stockspb.SetStockRequest{Sku: SKU, Count: count})
+func (c *stocksClient) SetStock(ctx context.Context, sku uint32, count uint64) error {
+	_, err := c.client.SetStock(ctx, &stockspb.SetStockRequest{Sku: sku, Count: count})
 	if err != nil {
 		return adapterconverter.FromStocksError(err)
 	}

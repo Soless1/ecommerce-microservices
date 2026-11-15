@@ -49,7 +49,7 @@ func FromOrderStatus(orderStatus entity.OrderStatus) lomspb.OrderStatus {
 }
 
 func ToItem(item *lomspb.Item) entity.OrderItem {
-	return entity.OrderItem{SKU: item.Sku, Count: item.Count}
+	return entity.OrderItem{SKU: item.GetSku(), Count: item.GetCount()}
 }
 func FromItem(item entity.OrderItem) *lomspb.Item {
 	return &lomspb.Item{Sku: item.SKU, Count: item.Count}
