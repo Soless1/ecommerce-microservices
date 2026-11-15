@@ -20,8 +20,8 @@ func Run(logger *zap.Logger, cfg *config.Config) {
 		logger.Fatal("no kafka brokers configured (KAFKA_BROKERS)")
 	}
 
-	//notifier, err := tgnotifier.NewOrderStatusTelegramNotifier(logger, cfg)
-	notifier, err := tgnotifier.NewOrderStatusRestNotifier(logger, cfg)
+	notifier, err := tgnotifier.NewOrderStatusTelegramNotifier(logger, cfg)
+	//notifier, err := tgnotifier.NewOrderStatusRestNotifier(logger, cfg)
 
 	if err != nil {
 		logger.Fatal("tg notifier init error", zap.Error(err))

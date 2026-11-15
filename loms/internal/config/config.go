@@ -31,6 +31,13 @@ type (
 			TTL         time.Duration `env:"OUTBOX_IN_PROGRESS_TTL" envDefault:"60s"`
 		}
 
+		Redis struct {
+			Host                string        `env:"REDIS_HOST" envDefault:"localhost"`
+			Port                string        `env:"REDIS_PORT" envDefault:"6379"`
+			ProductCacheTTL     time.Duration `env:"REDIS_PRODUCT_CACHE_TTL" envDefault:"1m"`
+			ProductCacheTimeout time.Duration `env:"REDIS_PRODUCT_CACHE_TIMEOUT" envDefault:"50ms"`
+		}
+
 		Kafka struct {
 			Brokers string `env:"KAFKA_BROKERS" envDefault:"localhost:9092"`
 			Topic   string `env:"KAFKA_NOTIFICATIONS_TOPIC" envDefault:"order_status_notifications"`
@@ -59,6 +66,14 @@ func (c *Config) ConstructPostgresURL() string {
 		Host:     net.JoinHostPort(c.PG.Host, c.PG.Port),
 		Path:     "/" + c.PG.DB,
 		RawQuery: "sslmode=disable",
+	}
+	return u.String()
+}
+
+func (c *Config) ConstructRedisURL() string {
+	u := url.URL{
+		Scheme: "redis",
+		Host:   net.JoinHostPort(c.Redis.Host, c.Redis.Port),
 	}
 	return u.String()
 }

@@ -69,7 +69,7 @@ func (o *outboxImpl) Start(
 		go o.worker(ctx, wg, batchSize, fetchPeriod, inProgressTTL)
 	}
 
-	return
+	wg.Wait()
 }
 
 func (o *outboxImpl) worker(
@@ -81,6 +81,7 @@ func (o *outboxImpl) worker(
 ) {
 	defer wg.Done()
 	ticker := time.NewTicker(waitTime)
+	defer ticker.Stop()
 
 	for {
 		select {

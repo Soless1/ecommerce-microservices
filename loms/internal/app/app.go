@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
@@ -24,6 +26,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	redis "github.com/redis/go-redis/v9"
+
 	stockscontroller "github.com/igoroutine-courses/microservices.ecommerce.loms/internal/controller/stocks"
 	stocksrepo "github.com/igoroutine-courses/microservices.ecommerce.loms/internal/repository/stocks"
 	stocksusecase "github.com/igoroutine-courses/microservices.ecommerce.loms/internal/usecase/stocks"
@@ -38,7 +42,10 @@ import (
 )
 
 func Run(logger *zap.Logger, cfg *config.Config) {
-	group, ctx := errgroup.WithContext(context.Background())
+	signalCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	group, ctx := errgroup.WithContext(signalCtx)
 
 	kafkaBrokers := cfg.KafkaBrokerAddrs()
 
@@ -67,15 +74,30 @@ func Run(logger *zap.Logger, cfg *config.Config) {
 	}
 
 	lomsTransactor := transactor.NewTransactor(pool)
-
 	outboxRepo := outboxrepo.NewOutboxRepository(pool)
+
+	redisOptions, err := redis.ParseURL(cfg.ConstructRedisURL())
+	if err != nil {
+		logger.Error("invalid Redis URL", zap.Error(err))
+		return
+	}
+	redisOptions.ContextTimeoutEnabled = true
+	redisOptions.MaxRetries = -1
+
+	cache := redis.NewClient(redisOptions)
+	defer func() {
+		if err := cache.Close(); err != nil {
+			logger.Error("close Redis client", zap.Error(err))
+		}
+	}()
 
 	stocksRepo := stocksrepo.NewPostgresRepository(pool)
 	stocksService := stocksusecase.NewStocksService(stocksRepo)
 	stocksServer := stockscontroller.NewStocksServer(stocksService)
 
 	productRepo := productrepo.NewPostgresRepository(pool)
-	productService := productusecase.NewProductService(productRepo)
+	cachedProductRepo := productrepo.NewCachedRepository(productRepo, cache, cfg)
+	productService := productusecase.NewProductService(cachedProductRepo)
 	productServer := productcontroller.NewProductServer(productService)
 
 	lomsRepo := orderrepo.NewPostgresRepository(pool)
@@ -94,9 +116,12 @@ func Run(logger *zap.Logger, cfg *config.Config) {
 		}
 	}
 
-	outbox := outbox.New(logger, outboxRepo, globalOutboxHandler, cfg, lomsTransactor)
+	outboxWorker := outbox.New(logger, outboxRepo, globalOutboxHandler, cfg, lomsTransactor)
 
-	outbox.Start(ctx, cfg.Outbox.Workers, cfg.Outbox.BatchSize, cfg.Outbox.FetchPeriod, cfg.Outbox.TTL)
+	group.Go(func() error {
+		outboxWorker.Start(ctx, cfg.Outbox.Workers, cfg.Outbox.BatchSize, cfg.Outbox.FetchPeriod, cfg.Outbox.TTL)
+		return nil
+	})
 
 	group.Go(func() error {
 		return runGrpc(ctx, logger, cfg, api)

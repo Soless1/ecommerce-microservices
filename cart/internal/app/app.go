@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
@@ -30,6 +32,9 @@ import (
 )
 
 func Run(logger *zap.Logger, cfg *config.Config) {
+	signalCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
 	lomsConn, err := grpc.NewClient(
 		cfg.Clients.LOMSGrpcAddr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -53,7 +58,7 @@ func Run(logger *zap.Logger, cfg *config.Config) {
 		stockspb.NewStocksClient(lomsConn),
 	)
 
-	group, ctx := errgroup.WithContext(context.Background())
+	group, ctx := errgroup.WithContext(signalCtx)
 
 	pool, err := newPostgresPool(ctx, cfg.ConstructPostgresURL())
 	if err != nil {
@@ -79,14 +84,14 @@ func Run(logger *zap.Logger, cfg *config.Config) {
 		return runGrpc(ctx, logger, cfg, api)
 	})
 	group.Go(func() error {
-		return runRest(ctx, logger, cfg)
+		return runRest(ctx, cfg)
 	})
 	if err := group.Wait(); err != nil {
 		logger.Error("Cart server stopped with an error", zap.Error(err))
 	}
 }
 
-func runRest(ctx context.Context, Slogger *zap.Logger, cfg *config.Config) error {
+func runRest(ctx context.Context, cfg *config.Config) error {
 	mux := runtime.NewServeMux()
 
 	endpoint := cfg.GRPC.Endpoint

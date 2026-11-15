@@ -1,3 +1,7 @@
+x-ports:
+  postgres: &postgres_port "5432"
+  redis: &redis_port "6379"
+
 services:
   cart:
     image: cart
@@ -11,7 +15,7 @@ services:
       GRPC_GATEWAY_PORT: "8080"
       GRPC_ENDPOINT: "cart:50051"
       POSTGRES_HOST: "postgres"
-      POSTGRES_PORT: "5432"
+      POSTGRES_PORT: *postgres_port
       POSTGRES_DB: "ecommerce"
       POSTGRES_USER: "ecommerce_user"
       POSTGRES_PASSWORD: "12345"
@@ -22,8 +26,8 @@ services:
       loms:
         condition: service_started
     ports:
-      - "${CART_HTTP_HOST_PORT:-8080}:8080"
-      - "${CART_GRPC_HOST_PORT:-51051}:50051"
+      - "8080:8080"
+      - "51051:50051"
 
   cart-2:
     image: cart
@@ -37,7 +41,7 @@ services:
       GRPC_GATEWAY_PORT: "8090"
       GRPC_ENDPOINT: "cart-2:50061"
       POSTGRES_HOST: "postgres"
-      POSTGRES_PORT: "5432"
+      POSTGRES_PORT: *postgres_port
       POSTGRES_DB: "ecommerce"
       POSTGRES_USER: "ecommerce_user"
       POSTGRES_PASSWORD: "12345"
@@ -64,7 +68,7 @@ services:
       GRPC_PORT: "50052"
       GRPC_GATEWAY_PORT: "8081"
       POSTGRES_HOST: "postgres"
-      POSTGRES_PORT: "5432"
+      POSTGRES_PORT: *postgres_port
       POSTGRES_DB: "ecommerce"
       POSTGRES_USER: "ecommerce_user"
       POSTGRES_PASSWORD: "12345"
@@ -74,14 +78,20 @@ services:
       OUTBOX_IN_PROGRESS_TTL: "1s"
       KAFKA_BROKERS: "kafka-single:9092"
       KAFKA_NOTIFICATIONS_TOPIC: "order_status_notifications"
+      REDIS_HOST: "redis"
+      REDIS_PORT: *redis_port
+      REDIS_PRODUCT_CACHE_TTL: "1m"
+      REDIS_PRODUCT_CACHE_TIMEOUT: "50ms"
     depends_on:
       postgres:
         condition: service_healthy
       kafka-single:
         condition: service_healthy
+      redis:
+        condition: service_started
     ports:
-      - "${LOMS_GRPC_HOST_PORT:-51052}:50052"
-      - "${LOMS_HTTP_HOST_PORT:-8081}:8081"
+      - "51052:50052"
+      - "8081:8081"
 
   loms-2:
     image: loms
@@ -94,7 +104,7 @@ services:
       GRPC_PORT: "50062"
       GRPC_GATEWAY_PORT: "8091"
       POSTGRES_HOST: "postgres"
-      POSTGRES_PORT: "5432"
+      POSTGRES_PORT: *postgres_port
       POSTGRES_DB: "ecommerce"
       POSTGRES_USER: "ecommerce_user"
       POSTGRES_PASSWORD: "12345"
@@ -104,9 +114,15 @@ services:
       OUTBOX_IN_PROGRESS_TTL: "1s"
       KAFKA_BROKERS: "kafka-single:9092"
       KAFKA_NOTIFICATIONS_TOPIC: "order_status_notifications"
+      REDIS_HOST: "redis"
+      REDIS_PORT: *redis_port
+      REDIS_PRODUCT_CACHE_TTL: "1m"
+      REDIS_PRODUCT_CACHE_TIMEOUT: "50ms"
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_started
       kafka-single:
         condition: service_healthy
       loms:
@@ -124,7 +140,7 @@ services:
       dockerfile: ./notifications/Dockerfile
     restart: unless-stopped
     environment:
-      CALLBACK_ADDR: "${CALLBACK_ADDR:-}"
+      CALLBACK_ADDR: ""
       TELEGRAM_TOKEN: "${TELEGRAM_TOKEN:-}"
       TELEGRAM_CHAT_ID: "${TELEGRAM_CHAT_ID:-0}"
       KAFKA_BROKERS: "kafka-single:9092"
@@ -141,17 +157,18 @@ services:
       POSTGRES_DB: "ecommerce"
       POSTGRES_USER: "ecommerce_user"
       POSTGRES_PASSWORD: "12345"
-      POSTGRES_PORT: "5432"
+      POSTGRES_PORT: *postgres_port
     volumes:
       - postgres-data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - target: *postgres_port
+        published: "5432"
     command:
       - "postgres"
-      - "-c"
-      - "port=5432"
+      - "-p"
+      - *postgres_port
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ecommerce_user -d ecommerce" ]
+      test: [ "CMD-SHELL", "pg_isready -p \"$$POSTGRES_PORT\" -U ecommerce_user -d ecommerce" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -160,8 +177,8 @@ services:
     image: confluentinc/cp-kafka:7.6.1
     hostname: kafka-single
     ports:
-      - "${KAFKA_HOST_PORT:-9094}:9094"
-      - "${KAFKA_JMX_HOST_PORT:-9101}:9101"
+      - "9094:9094"
+      - "9101:9101"
     environment:
       CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
       KAFKA_PROCESS_ROLES: "broker,controller"
@@ -170,7 +187,7 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT"
       KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
       KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
-      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka-single:9092,PLAINTEXT_HOST://localhost:${KAFKA_HOST_PORT:-9094}"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka-single:9092,PLAINTEXT_HOST://localhost:9094"
       KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka-single:9093"
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
@@ -188,7 +205,7 @@ services:
   kafdrop:
     image: obsidiandynamics/kafdrop:4.0.1
     ports:
-      - "${KAFDROP_HOST_PORT:-9000}:9000"
+      - "9000:9000"
     environment:
       KAFKA_BROKERCONNECT: "kafka-single:9092"
       JVM_OPTS: "-Xms32M -Xmx64M"
@@ -196,6 +213,28 @@ services:
     depends_on:
       kafka-single:
         condition: service_healthy
+
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    environment:
+      REDIS_PORT: *redis_port
+    ports:
+      - target: *redis_port
+        published: "6379"
+    command:
+      - "redis-server"
+      - "--port"
+      - *redis_port
+      - "--maxmemory"
+      - "64mb"
+      - "--maxmemory-policy"
+      - "allkeys-lru"
+    healthcheck:
+      test: [ "CMD-SHELL", "redis-cli -p \"$$REDIS_PORT\" ping | grep -qx PONG" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
 volumes:
   postgres-data:
